@@ -282,6 +282,8 @@ export interface SimConfig {
   /** The kill announcement tiers (Section 7.17). */
   multiKillTiers: readonly { count: number; text: string }[];
   spreeTiers: readonly { count: number; text: string }[];
+  /** How much of full health one hit must take to be called out (Section 7.24). */
+  heavyHitShare: number;
 }
 
 /** Why a round ended. */
@@ -437,6 +439,7 @@ export function simConfigFromTuning(tuning: Tuning = loadTuning()): SimConfig {
     targetSwitchMargin: tuning.combat.targetSwitchMargin,
     multiKillTiers: loadAnnouncements().multiKill,
     spreeTiers: loadAnnouncements().spree,
+    heavyHitShare: loadAnnouncements().heavyHitShare,
   };
 }
 

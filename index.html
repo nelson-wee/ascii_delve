@@ -161,6 +161,10 @@
       #feed li + li { margin-top: 1px; }
       #feed li:last-child { color: var(--fg); }
       #feed li.announce { color: #ffd166; }
+      /* A head shot is the rarest line in the feed. It gets the loudest
+         colour, and a heavy hit gets a quieter one (dev-guide Section 7.24). */
+      #feed li.headShot { color: #ff4d6d; font-weight: 700; letter-spacing: 0.04em; }
+      #feed li.heavyHit { color: #ff9f5a; }
       #feed li.spreeEnded { color: #ff6a8a; }
       #feed li.suddenDeath { color: var(--accent); letter-spacing: 0.1em; }
       #status.urgent { color: var(--accent); }
@@ -347,6 +351,29 @@
       }
       .ticket-actions { grid-area: actions; display: flex; gap: 4px; }
       .ticket-actions .choice { min-height: 32px; padding: 0 10px; }
+      /* The lobby and the round brief (dev-guide Section 7.25). */
+      .lobby-weapons, .brief-weapons {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        font-size: 0.72rem;
+      }
+      .lobby-weapons li, .brief-weapons li { color: var(--fg); }
+      .brief-stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+      }
+      .brief-stat {
+        display: flex;
+        gap: 6px;
+        align-items: baseline;
+        font-size: 0.72rem;
+      }
+      .brief-stat b { color: var(--team-a); }
       .screen .choice {
         min-height: 40px;
         padding: 0 14px;

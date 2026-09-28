@@ -12,11 +12,12 @@
  * the state of the round through `SimArenaView` and it reads the event bus for
  * the effects, so the display never reaches into a system of the simulation.
  */
-import { loadDefaultTactics, loadTuning } from "./core/data.js";
+import { loadTuning } from "./core/data.js";
 import { EventBus, type GameEvent } from "./core/events.js";
-import type { Tactics } from "./core/schemas.js";
+import { deriveSeed } from "./core/rng.js";
 import {
   createSession,
+  matchSeedOf,
   matchSeedsOf,
   nextMatch,
   recordMatch,
@@ -39,8 +40,10 @@ import type { WeaponVisualHints } from "./render/vfxLayer.js";
 import {
   createRoundState,
   DEFAULT_ROLES,
+  sideOffsetOf,
   simConfigFromTuning,
   step,
+  teamSideIndex,
   TEAM_IDS,
   type MatchPlan,
   type Role,
@@ -49,6 +52,8 @@ import {
   type TeamId,
 } from "./sim/index.js";
 import { openMainMenu, openMatchOverScreen, type MenuChoice, type Screen } from "./ui/menu.js";
+import { openLobbyScreen } from "./ui/lobbyScreen.js";
+import { roundBrief } from "./report/roundBrief.js";
 import {
   formatTicket,
   makeTicket,
@@ -339,6 +344,9 @@ try {
    */
   let pendingSeeds: Partial<MatchSeeds> = {};
 
+  /** How many times the lobby rerolled each part, so a reroll always moves. */
+  const lobbyRolls = new Map<string, number>();
+
   /** The ticket of the match on screen, or `null` when no match is running. */
   function currentTicket(): ReplayTicket | null {
     if (!session || !setup) return null;
@@ -367,6 +375,44 @@ try {
     }
   }
 
+  /**
+   * Open the lobby, in test mode, or go straight to the match.
+   *
+   * A tournament gives no choice: new ground, and the weapons the session
+   * pinned. Test mode is for asking a question, so it gets the controls
+   * (Section 7.25).
+   */
+  function beginMatch(): void {
+    if (!session) return;
+    if (session.mode !== "test") {
+      startMatch();
+      return;
+    }
+    const current = session;
+    const opening = { ...matchSeedsOf(matchSeedOf(current.seed, current.matchNumber)), ...current.pinned, ...pendingSeeds };
+    screen = openLobbyScreen({
+      container: stageEl,
+      matchNumber: current.matchNumber,
+      seeds: opening,
+      build: (seeds) => nextMatch(current, seeds),
+      // A reroll takes the next value of a stream of its own, so pressing it
+      // twice never gives the same seed back.
+      reroll: (part) => {
+        const step = (lobbyRolls.get(part) ?? 0) + 1;
+        lobbyRolls.set(part, step);
+        return deriveSeed(current.seed, `lobby:${part}:${current.matchNumber}:${step}`);
+      },
+      onStart: (seeds) => {
+        closeScreen();
+        // The lobby holds its answer for this match and for the ones after it,
+        // so a player who kept a layout keeps it until they change it.
+        current.pinned = { ...seeds };
+        pendingSeeds = {};
+        startMatch();
+      },
+    });
+  }
+
   /** Build the arena and the first round of the next match of the session. */
   function startMatch(): void {
     if (!session) return;
@@ -378,9 +424,11 @@ try {
     roundWins = { A: 0, B: 0 };
     matchWinner = null;
     roundNumber = 1;
+    // The roles own the tactics, so a plan carries roles and nothing else
+    // (Section 7.26). The player keeps the composition they last chose.
     plan = {
-      A: { tactics: plan.A?.tactics ?? loadDefaultTactics(), roles: [...(plan.A?.roles ?? DEFAULT_ROLES)] },
-      B: { tactics: loadDefaultTactics(), roles: [...DEFAULT_ROLES] },
+      A: { roles: [...(plan.A?.roles ?? DEFAULT_ROLES)] },
+      B: { roles: [...DEFAULT_ROLES] },
     };
 
     // A match gets its own palette from the seed of the session, so a run has
@@ -405,7 +453,9 @@ try {
     ].join("  ·  ");
     updateAddress();
 
-    beginRound();
+    // Round 1 of a match now asks for tactics, like every other round. The
+    // ground is on the screen, because that is what the player plans for.
+    openTactics(1, true);
   }
 
   function matchOptions() {
@@ -485,7 +535,7 @@ try {
       },
       onNext: () => {
         closeScreen();
-        startMatch();
+        beginMatch();
       },
       onMenu: () => {
         closeScreen();
@@ -494,23 +544,56 @@ try {
     });
   }
 
-  /** The between-round screen of Section 7.4. */
-  function openBetweenRounds(): void {
+  /**
+   * The tactics screen (Section 7.4). It opens between two rounds **and**
+   * before round 1 of a match.
+   *
+   * Before this, round 1 of a match ran on the tactics of the match before it,
+   * which a player had set for different ground (Section 7.24).
+   */
+  function openTactics(nextRound: number, ground: boolean): void {
+    if (!session || !setup) return;
+    // The half that team A holds comes from the round number and from the
+    // offset of the match, so the parity of the round number is not enough
+    // (Section 7.20.24).
+    const startsNear = teamSideIndex("A", nextRound, sideOffsetOf(setup.seed)) === 0;
     screen = openTacticsScreen({
       container: stageEl,
       teamId: "A",
-      tactics: plan.A?.tactics ?? loadDefaultTactics(),
       roles: plan.A?.roles ?? DEFAULT_ROLES,
       rounds,
       roundWins,
-      nextRoundNumber: roundNumber + 1,
-      onStart: (tactics: Tactics, roles: Role[]) => {
+      nextRoundNumber: nextRound,
+      startsNear,
+      ...(ground
+        ? {
+            arenaName: `${setup.arena.profile.style} ${setup.arena.width}×${setup.arena.height}`,
+            arenaMetrics: setup.arena.metrics,
+          }
+        : {}),
+      // Between two rounds, what the last one did (Section 7.25). Before round
+      // 1 there is no round to read, and the ground takes its place.
+      ...(nextRound > 1
+        ? {
+            brief: roundBrief(bus.log, nextRound - 1, {
+              ticksPerSecond: config.ticksPerSecond,
+              multiKillWindowTicks: config.multiKillWindowTicks,
+              ...(state ? { contact: state.bots } : {}),
+            }),
+          }
+        : {}),
+      onStart: (roles: Role[]) => {
         closeScreen();
-        plan.A = { tactics, roles };
-        roundNumber += 1;
+        plan.A = { roles };
+        roundNumber = nextRound;
         beginRound();
       },
     });
+  }
+
+  /** The between-round screen of Section 7.4. */
+  function openBetweenRounds(): void {
+    openTactics(roundNumber + 1, false);
   }
 
   // ------------------------------------------------------------------------
@@ -551,7 +634,7 @@ try {
         const warning = ticketWarning(choice);
         if (warning !== null) statusEl.textContent = warning;
         plan = {};
-        startMatch();
+        beginMatch();
       },
     });
   }

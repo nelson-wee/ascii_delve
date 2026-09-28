@@ -1,54 +1,36 @@
 /**
- * The between-round tactics screen (dev-guide Sections 7.4 and 7.18).
- * Browser only.
+ * The team screen (dev-guide Sections 7.4, 7.18 and 7.26). Browser only.
  *
- * The screen opens after a round of a match ends and before the next round
- * starts. The player sets the tactics of Section 6.4 and the role of each bot
- * (Section 7.11) for their own team. The other team keeps the tactics that the
- * match gave it.
+ * It opens before round 1 of a match and between two rounds. The player builds
+ * a team by giving each of the three bots a **role**, and the role owns that
+ * bot's tactics.
+ *
+ * **It used to hold seven sliders, and they did nothing that could be
+ * measured.** Seven continuous values over a team cannot be swept by a batch,
+ * so they read as noise; worse, they were applied team-wide and threw the role
+ * presets away, so a tank and an overwatch differed only by six action
+ * weights. A composition is one categorical choice with ten values, which a
+ * batch can sweep and a player can learn.
  *
  * The screen holds no simulation state: it takes a plan, it gives a plan back,
  * and the match loop does the rest.
  */
-import type { Tactics } from "../core/schemas.js";
+import type { RoundBrief } from "../report/roundBrief.js";
+import { describeArena, type ArenaMetrics } from "../arena/metrics.js";
+import { loadRoles } from "../core/data.js";
 import type { Role, RoundOutcome, TeamId } from "../sim/state.js";
 import { ROLES } from "../sim/state.js";
-import type { RangeBand } from "../weapons/types.js";
 
-/** Every tactics value that the screen shows, in the order it shows them. */
-const SLIDERS: readonly { key: keyof Tactics; label: string; help: string }[] = [
-  { key: "aggression", label: "aggression", help: "press the fight, fight at low health" },
-  { key: "itemControl", label: "item control", help: "cross the arena for a pickup" },
-  { key: "holdPosition", label: "hold position", help: "keep a sightline, take no items" },
-  { key: "evasion", label: "evasion", help: "dodge more, aim worse" },
-  { key: "hazardTolerance", label: "hazard nerve", help: "walk over a hazard tile" },
-];
-
-const RANGES: readonly RangeBand[] = ["close", "mid", "long"];
-
-/**
- * The archetypes a player can name as the tournament weapon priority. The
- * Redeemer is not here: it is a power-up, not a weapon a run generates
- * (Section 7.20.18).
- */
-type WeaponPref = NonNullable<Tactics["weaponRolePref"]>;
-
-const WEAPON_PREFS: readonly (WeaponPref | "")[] = [
-  "",
-  "precision",
-  "assault",
-  "marksman",
-  "heavy",
-  "splash",
-  "denial",
-  "versatile",
-];
+/** What each role is for, in the words a player reads. */
+const ROLE_TEXT: Readonly<Record<string, string>> = {
+  tank: "Walks in. Close range, heavy weapons, takes the items and the hazards.",
+  overwatch: "Holds a sightline. Long range, marksman weapons, moves least.",
+  skirmisher: "Works the middle. Dodges most, follows a teammate, takes no ground.",
+};
 
 export interface TacticsScreenOptions {
   container: HTMLElement;
   teamId: TeamId;
-  /** The tactics that the team used in the round that just ended. */
-  tactics: Tactics;
   /** The role of each bot of the team, in slot order. */
   roles: readonly Role[];
   /** The rounds of this match so far, newest last. */
@@ -56,13 +38,141 @@ export interface TacticsScreenOptions {
   roundWins: Readonly<Record<TeamId, number>>;
   /** The number of the round that starts next. */
   nextRoundNumber: number;
+  /**
+   * True when the team starts this round on the near half.
+   *
+   * The caller works it out with `teamSideIndex`, because the half comes from
+   * the round number **and** the offset that the match seed gives
+   * (Section 7.20.24). The parity of the round number alone was wrong for half
+   * of all matches.
+   */
+  startsNear: boolean;
+  /** The ground, on the screen that opens before round 1 (Section 7.24). */
+  arenaName?: string;
+  arenaMetrics?: ArenaMetrics;
+  /**
+   * What the round that just ended looked like (Section 7.25).
+   *
+   * A score says who won. It does not say where the fighting happened, which
+   * weapon did the work, or how fast the round ran, and a tactic is a guess
+   * without those.
+   */
+  brief?: RoundBrief;
   /** The player pressed "start the round". */
-  onStart: (tactics: Tactics, roles: Role[]) => void;
+  onStart: (roles: Role[]) => void;
 }
 
 export interface TacticsScreen {
   /** Take the screen off the page. */
   close(): void;
+}
+
+/** One row of a small table: a label and a value. */
+function stat(label: string, value: string): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "brief-stat";
+  const name = document.createElement("span");
+  name.className = "dim";
+  name.textContent = label;
+  const text = document.createElement("b");
+  text.textContent = value;
+  row.append(name, text);
+  return row;
+}
+
+const BAND_WORDS: Readonly<Record<string, string>> = {
+  close: "close",
+  mid: "mid",
+  long: "long",
+};
+
+/**
+ * What the last round did, in the three things a player can act on: where the
+ * fighting happened, which weapons did it, and how fast it ran
+ * (Section 7.25).
+ */
+function briefBlock(brief: RoundBrief): HTMLElement {
+  const group = document.createElement("div");
+  group.className = "menu-group";
+  const heading = document.createElement("h3");
+  heading.textContent = `Round ${brief.roundNumber}: what happened`;
+  group.append(heading);
+
+  const kills = brief.kills.A + brief.kills.B;
+  const bands = document.createElement("div");
+  bands.className = "brief-stats";
+  for (const band of ["close", "mid", "long"]) {
+    const count = brief.killsByBand[band] ?? 0;
+    const share = kills === 0 ? 0 : Math.round((count / kills) * 100);
+    bands.append(stat(`${BAND_WORDS[band] ?? band} kills`, `${count}  (${share} %)`));
+  }
+  bands.append(stat("kill every", `${brief.killGapSeconds.toFixed(1)} s`));
+  bands.append(stat("a fight lasts", `${brief.timeToKillSeconds.toFixed(1)} s`));
+  bands.append(stat("in contact", `${Math.round(brief.contactShare * 100)} %`));
+  if (brief.unawareKills > 0) bands.append(stat("killed from behind", String(brief.unawareKills)));
+  group.append(bands);
+
+  if (brief.weapons.length > 0) {
+    const list = document.createElement("ul");
+    list.className = "brief-weapons";
+    // The weapons that made a kill, most kills first. A weapon that made none
+    // is not on this list, and that is itself an answer.
+    for (const weapon of brief.weapons.slice(0, 6)) {
+      const item = document.createElement("li");
+      item.textContent =
+        `${weapon.weaponId} (${weapon.archetype}) — ${weapon.kills} ` +
+        `${weapon.kills === 1 ? "kill" : "kills"}, mostly at ${BAND_WORDS[weapon.band] ?? weapon.band} range`;
+      list.append(item);
+    }
+    group.append(list);
+  }
+
+  const taken = Object.entries(brief.pickupsByKind).sort((a, b) => b[1] - a[1]);
+  if (taken.length > 0) {
+    const items = document.createElement("p");
+    items.className = "dim";
+    items.textContent = `items taken: ${taken.map(([kind, count]) => `${count}× ${kind}`).join("  ·  ")}`;
+    group.append(items);
+  }
+  return group;
+}
+
+/**
+ * What every role does, side by side (Section 7.26).
+ *
+ * A player cannot choose between three roles without reading them, and the
+ * numbers live in `data/roles.json`, so the table reads them instead of
+ * repeating them.
+ */
+function roleTable(): HTMLElement {
+  const group = document.createElement("div");
+  group.className = "menu-group";
+  const heading = document.createElement("h3");
+  heading.textContent = "What the roles do";
+  group.append(heading);
+
+  const roles = loadRoles().roles;
+  const list = document.createElement("ul");
+  list.className = "brief-weapons";
+  for (const name of ROLES) {
+    const data = roles[name];
+    if (!data) continue;
+    const item = document.createElement("li");
+    const title = document.createElement("b");
+    title.textContent = name;
+    const body = document.createElement("span");
+    body.className = "dim";
+    body.textContent =
+      ` — range ${data.tactics.rangePref.join(" > ")}` +
+      `; weapons ${data.tactics.weaponPref.slice(0, 3).join(" > ")}` +
+      `; aggression ${Math.round(data.tactics.aggression * 100)}` +
+      `, holds ${Math.round(data.tactics.holdPosition * 100)}` +
+      `, dodges ${Math.round(data.tactics.evasion * 100)}`;
+    item.append(title, body);
+    list.append(item);
+  }
+  group.append(list);
+  return group;
 }
 
 function field(label: string, help: string, control: HTMLElement): HTMLElement {
@@ -83,16 +193,15 @@ function field(label: string, help: string, control: HTMLElement): HTMLElement {
  */
 export function openTacticsScreen(options: TacticsScreenOptions): TacticsScreen {
   const { container } = options;
-  const tactics: Tactics = { ...options.tactics };
   const roles: Role[] = [...options.roles];
 
   const screen = document.createElement("section");
   screen.className = "screen";
   screen.setAttribute("role", "dialog");
-  screen.setAttribute("aria-label", "tactics for the next round");
+  screen.setAttribute("aria-label", "the team for the next round");
 
   const title = document.createElement("h2");
-  title.textContent = `Round ${options.nextRoundNumber} — team ${options.teamId} tactics`;
+  title.textContent = `Round ${options.nextRoundNumber} — build team ${options.teamId}`;
   screen.append(title);
 
   const summary = document.createElement("p");
@@ -109,62 +218,48 @@ export function openTacticsScreen(options: TacticsScreenOptions): TacticsScreen 
       : `${played}  ·  rounds won A ${options.roundWins.A} — ${options.roundWins.B} B`;
   screen.append(summary);
 
+  // The ground, before round 1. A player sets tactics for the arena ahead, and
+  // before this screen opened the first round of a match ran on the tactics of
+  // the match before it (Section 7.24).
+  const { arenaName, arenaMetrics } = options;
+  if (arenaName !== undefined) {
+    const where = document.createElement("h3");
+    where.textContent = arenaName;
+    screen.append(where);
+    if (arenaMetrics !== undefined) {
+      const words = document.createElement("p");
+      words.className = "dim";
+      words.textContent = describeArena(arenaMetrics).join(" ");
+      screen.append(words);
+    }
+  }
+
+  const { brief } = options;
+  if (brief !== undefined) screen.append(briefBlock(brief));
+
   // The teams change ends after every round (Section 7.20.24). The player has
   // to know: the ground that the team starts on decides the first fight.
   const ends = document.createElement("p");
   ends.className = "dim";
-  const side = options.nextRoundNumber % 2 === 0 ? "the far end" : "the near end";
+  const side = options.startsNear ? "the near end" : "the far end";
   ends.textContent = `Teams change ends. Team ${options.teamId} starts this round at ${side}.`;
   screen.append(ends);
 
   const form = document.createElement("div");
   form.className = "tactics";
 
-  for (const slider of SLIDERS) {
-    const input = document.createElement("input");
-    input.type = "range";
-    input.min = "0";
-    input.max = "100";
-    input.step = "5";
-    input.value = String(Math.round((tactics[slider.key] as number) * 100));
-    const readout = document.createElement("output");
-    readout.textContent = input.value;
-    input.addEventListener("input", () => {
-      const value = Number(input.value);
-      readout.textContent = input.value;
-      (tactics[slider.key] as number) = value / 100;
-    });
-    const control = document.createElement("span");
-    control.className = "tactic-control";
-    control.append(input, readout);
-    form.append(field(slider.label, slider.help, control));
-  }
-
-  const range = document.createElement("select");
-  for (const band of RANGES) {
-    const option = document.createElement("option");
-    option.value = band;
-    option.textContent = band;
-    option.selected = band === tactics.preferredRange;
-    range.append(option);
-  }
-  range.addEventListener("change", () => {
-    tactics.preferredRange = range.value as RangeBand;
-  });
-  form.append(field("range", "the band a bot picks its weapon for", range));
-
-  const pref = document.createElement("select");
-  for (const archetype of WEAPON_PREFS) {
-    const option = document.createElement("option");
-    option.value = archetype;
-    option.textContent = archetype === "" ? "any" : archetype;
-    option.selected = archetype === (tactics.weaponRolePref ?? "");
-    pref.append(option);
-  }
-  pref.addEventListener("change", () => {
-    tactics.weaponRolePref = pref.value === "" ? null : (pref.value as WeaponPref);
-  });
-  form.append(field("weapon priority", "the archetype a bot reaches for first", pref));
+  // A composition line, so the player reads the team as counts and not as
+  // three separate answers: "2 tank · 1 overwatch" (Section 7.26).
+  const composition = document.createElement("p");
+  composition.className = "dim";
+  const drawSummary = (): void => {
+    const counts = new Map<string, number>();
+    for (const role of roles) counts.set(role, (counts.get(role) ?? 0) + 1);
+    composition.textContent = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .map(([role, count]) => `${count} ${role}`)
+      .join("  ·  ");
+  };
 
   roles.forEach((role, slot) => {
     const select = document.createElement("select");
@@ -177,18 +272,21 @@ export function openTacticsScreen(options: TacticsScreenOptions): TacticsScreen 
     }
     select.addEventListener("change", () => {
       roles[slot] = select.value as Role;
+      drawSummary();
     });
-    form.append(field(`bot ${slot + 1}`, "role", select));
+    form.append(field(`bot ${slot + 1}`, ROLE_TEXT[role] ?? "role", select));
   });
 
-  screen.append(form);
+  drawSummary();
+  screen.append(composition, form);
+  screen.append(roleTable());
 
   const start = document.createElement("button");
   start.type = "button";
   start.className = "start";
   start.textContent = `Start round ${options.nextRoundNumber}`;
   start.addEventListener("click", () => {
-    options.onStart({ ...tactics }, [...roles]);
+    options.onStart([...roles]);
   });
   screen.append(start);
 

@@ -2826,6 +2826,243 @@ made it. That is a decision, not an oversight: the guide holds the findings,
 and a CSV that outlives the code that made it is a trap. `run.json` is what
 tells a reader which of the two they have.
 
+## 7.24 Reading a fight: what killed that bot, and when tactics are set
+
+Two changes that a player asked for, and a measurement that changed one of
+them.
+
+### 7.24.1 A critical hit is not what drops a bot
+
+The request was to announce a **head shot** on a critical hit, because a bot
+dropping from near full health is hard to follow. The first half is now in.
+The second half is not what a crit does.
+
+A crit needs **both** a condition (`targetUnaware` or `targetStationary`) and a
+roll of `critChance`. Six single rounds, two of each style:
+
+| Style | Hits | Crits | Kills | Crit kills | Biggest single hit |
+|---|---:|---:|---:|---:|---|
+| bastion #0 | 126 | 0 | 28 | 0 | 170 (`sniper-hitscan-0`) |
+| bastion #1 | 148 | 0 | 29 | 0 | 85 (`sniper-hitscan-2`) |
+| openfield #0 | 763 | 1 | 29 | 0 | 194 (`sniper-hitscan-3`) |
+| openfield #1 | 131 | 2 | 21 | 0 | 61 (`precise-hitscan-0`) |
+| cavern #0 | 199 | 1 | 22 | 0 | 117 (`redeemer`, area) |
+| cavern #1 | 208 | 0 | 26 | 0 | 26 (`heavy-cone-2`, area) |
+
+**A round makes 0 to 2 crits, and not one of them killed.** What drops a bot
+from near full health is a single sniper shot of 85 to 194 against a health
+maximum of 100. Health also falls by 80 in 4 to 6 ticks, which is a fifth of a
+second: at any speed above 1× the bar is full in one frame and empty in the
+next.
+
+So there are two announcements, not one:
+
+- **`headShot`**, on a critical hit, as asked. It is the rarest line in the
+  feed and it gets the loudest colour.
+- **`heavyHit`**, when one hit takes at least `heavyHitShare` of full health.
+  This was **not** asked for. It is the line that answers the question behind
+  the request, and the browser check showed it doing exactly that: `B1 hit A0
+  for 58` immediately above `B1 killed A0 with a marksman weapon at mid range`.
+
+`heavyHitShare` is in `data/announcements.json` and defaults to 0.5. Set it to
+1 to hear only the hits that take a whole bar, or raise it above 1 to turn the
+line off without touching any code.
+
+**The lesson is the one of Section 7.20.18 again.** The request named a cause,
+the cause was wrong, and six rounds of measurement cost less than shipping a
+feature that fires twice a round and explains nothing.
+
+### 7.24.2 Round 1 of a match now asks for tactics
+
+The tactics screen opened between two rounds and nowhere else, so round 1 of
+every match ran on the tactics of the **previous match**, which a player had
+set for different ground. The screen now opens before round 1 as well, and it
+names the arena and describes it in plain words, because the ground is what the
+player is planning for.
+
+`openTactics(nextRound, ground)` serves both: the between-round screen leaves
+the arena out, because the player has been looking at it for three minutes.
+
+**A bug it uncovered.** The screen said which end a team starts on, and it
+worked that out from `nextRoundNumber % 2`. That stopped being true when
+Section 7.20.24 gave the starting half to the match seed, so the line was wrong
+in about half of all matches. It now calls `teamSideIndex` with the real
+offset. **A number that the display recomputes instead of reading is a number
+that will drift away from the engine.**
+
+## 7.25 The weapons of a tournament, the lobby, and a round that says what it did
+
+Three changes that share one aim: **give the player something to learn, and
+something to read.**
+
+### 7.25.1 One weapon set for a tournament
+
+Section 7.20.22 found that a weapon preference moved a win rate by none. That
+is not surprising in hindsight: a new weapon set arrived with every arena, so a
+preference never had two matches to act over, and a player never had two
+matches to learn the guns.
+
+A tournament now pins the **weapons** seed to the session. The set holds for
+the whole tournament, and only the ground and the spawn table change. The same
+five guns, on new ground, with the items in new places.
+
+`Session.pinned` is the mechanism, and `nextMatch` reads three layers:
+
+    the match seed  ->  what the session pinned  ->  what a ticket asked for
+
+A ticket wins, because a ticket names one match exactly. A hand-edited
+`weapons=` therefore applies to that one match, and the match after it goes
+back to the pin. A plain replay of a session seed is unaffected, because the
+pin is derived from that seed.
+
+**The spawn table stays per match on purpose.** Same guns, different places:
+the ground and the item layout are the variables, and the loadout is the
+constant a player can learn. That is option B of the three that were weighed;
+option A moved the spawn table too, and option C is a draft, which belongs with
+the run structure of M11. TBD
+
+### 7.25.2 The lobby, in test mode
+
+A tournament gives no choice. Test mode is for asking a question, and a
+question needs a control, so it gets a lobby before every match:
+
+    ground        keep · reroll · a seed
+    weapons       keep · reroll · a seed
+    spawn table   keep · reroll · a seed
+
+**Keep one and reroll another, and the lobby is an experiment.** Hold the
+layout and change the guns, and the difference belongs to the guns. Hold both
+and change where the items lie, and it belongs to the spawn table. It is the
+instrument of Section 7.20.26 — change one thing and hold the rest equal — in
+the hands of the player.
+
+Three rules that the code holds:
+
+- **It shows the answer before the player takes it.** Every change rebuilds the
+  match and redraws all three parts, because the arena decides what the weapons
+  lie on.
+- **A reroll always moves.** Each part has a counter, and a reroll takes
+  `lobby:<part>:<match>:<step>`, so pressing it twice never gives the same seed
+  back.
+- **The lobby answer holds.** What the player chose becomes `session.pinned`,
+  so a kept layout stays kept until they change it.
+
+The lobby opens **before** the tactics screen. A player sets tactics for ground
+and guns they can see.
+
+### 7.25.3 A round that says what it did
+
+The tactics screen showed the score of the last round and nothing else. A score
+says who won. It does not say why, and a tactic is a guess without that.
+
+`roundBrief` reads one round out of the match log and gives the three things a
+player can act on, each one tied to a control on the same screen:
+
+| It shows | It decides |
+|---|---|
+| Kills by range band | `preferredRange`, and the weapon a bot reaches for |
+| Kills per weapon, and the band most of them landed at | `weaponRolePref` |
+| Seconds between kills, how long a fight lasts, the contact share | `aggression`, `holdPosition`, `itemControl` |
+
+A real round read: `close 5 (19 %) · mid 18 (67 %) · long 4 (15 %) · kill every
+5.7 s · a fight lasts 6.9 s · in contact 36 % · killed from behind 3`, above
+`sniper-line-0 (marksman) — 16 kills, mostly at mid range`. Sixteen of
+twenty-seven kills came from one marksman rifle at mid range. **That is a
+tactics screen that answers itself.**
+
+The tempo numbers are the ones of Section 7.22, and this is the first place a
+player sees them. Before round 1 there is no round to read, so the ground takes
+its place (Section 7.24).
+
+## 7.26 The role owns the tactics
+
+**The finding that started this.** `createSimState` read:
+
+    const preset = options.tactics ? tacticsFor(teamId) : (roleData?.tactics ?? ...)
+
+A caller that passed tactics **threw the role preset away**. The browser always
+passed them, and so did the batch, so the role preset was used almost nowhere.
+A `tank` and an `overwatch` differed only by their six `behavior` weights;
+everything that makes a tank a tank — the band it wants, the weapon it reaches
+for, how much it holds ground — came from one team-wide slider and was
+identical for all three bots.
+
+Two things follow. The composition table of Section 7.20.13 (`standard` 52.8 %,
+`turtle` 48.8 %, `rush` 48.5 %) measured **only the behaviour weights**; four
+points from six multipliers alone is more encouraging than it looked. And
+"weapon priority moved a win rate by none" had an obvious cause: it was one
+value for a whole team, over a weapon set that changed with every arena.
+
+### 7.26.1 Why a template beats a slider
+
+Seven continuous values over a team **cannot be swept**. A batch cannot walk a
+seven-dimensional space, so the numbers read as noise no matter what they do. A
+composition is one categorical choice with ten values (a multiset of three from
+three roles), and ten against ten is a hundred cells, which one batch covers.
+
+A preset can also carry a balance target that a person can state and a test can
+check: "skirmisher beats overwatch, overwatch beats tank, tank beats
+skirmisher". `aggression: 0.62` has no such target.
+
+**And the tempo measures of Section 7.22 can check a role against its own
+name**, with no win rate at all. A tank and an overwatch must differ in their
+band distribution and their contact share. Two roles with the same tempo
+signature are one role with two labels, and that is a finding on its own.
+
+### 7.26.2 What changed
+
+- **The role owns the tactics.** `roleData.tactics` is the base for every bot,
+  always.
+- **`tactics` became `tacticsOverride`.** It still throws the role presets away,
+  for a batch or a test that wants one uniform team, and its name now says so.
+  A batch that measures compositions sets `useRoleTactics` and leaves it out.
+- **The team screen lost its seven sliders.** It picks a role for each of the
+  three bots, shows the composition as counts (`2 tank · 1 skirmisher`), and
+  prints what each role does, read from `data/roles.json` rather than repeated
+  in the code.
+
+A team-wide layer will come back as something more tactical than a slider. That
+decision is open. TBD
+
+### 7.26.3 Two rankings, not two favourites
+
+| Field | Was | Is |
+|---|---|---|
+| `preferredRange` | one band | `rangePref`: all three bands, best first |
+| `weaponRolePref` | one archetype, or null | `weaponPref`: archetypes, best first, may be partial |
+
+**A range ranking, because a role has an opinion about all three bands.** A role
+that likes close quarters also minds long range more than mid, and one
+favourite band could not say that. The weights keep the old tuning honest: the
+head of the list is worth `1 + bias`, exactly what one favourite band was worth;
+the middle band is neutral; the last is worth `1 / (1 + bias)`, so a role walks
+**away** from the band it likes least instead of merely preferring elsewhere.
+
+| Role | Range, best first | Weapons, best first |
+|---|---|---|
+| tank | close > mid > long | heavy > splash > assault > versatile > denial |
+| overwatch | long > mid > close | marksman > precision > denial > versatile > assault |
+| skirmisher | mid > close > long | assault > versatile > precision > splash > marksman |
+
+**A weapon ranking, because a run offers five weapons.** One favourite archetype
+was silent about four of them. The head of the list takes the whole bonus and
+each place after it takes less, down to one share for the last; an archetype
+the list leaves out takes none, so a role can be silent about a weapon instead
+of ranking every one. A list of one gives exactly the old weight, so nothing
+about the tuning constant changed meaning.
+
+`ai.preferredRangeBias` and `ai.weaponRolePrefBonus` are now `ai.rangePrefBias`
+and `ai.weaponPrefBonus`. A name that describes a field which no longer exists
+is the shape of defect this project keeps paying for (Section 7.20.18).
+
+### 7.26.4 Not measured yet
+
+Every composition number in this guide predates this change and was taken with
+the role presets disabled. **They are history, not a baseline.** The first batch
+after this should set `useRoleTactics`, sweep the ten compositions against each
+other, and read two things: the win-rate matrix, and whether each role's tempo
+signature matches its name. TBD
+
 ## 8. Match flow (sequence)
 
 1. Load the arena and the weapon set for the match.

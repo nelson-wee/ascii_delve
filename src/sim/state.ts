@@ -27,6 +27,7 @@ import {
   type SpawnTable,
 } from "./pickups.js";
 import type { Cell, Vec2 } from "../core/types.js";
+import type { CoverConfig } from "./cover.js";
 import type { RangeBand, Weapon } from "../weapons/types.js";
 
 /** Team ids of Milestone M3. Generated team names arrive with M11. */
@@ -106,6 +107,13 @@ export interface BotState {
   tactics: Tactics;
   /** The role of the bot (Section 7.11). It sets the preset and the behaviors. */
   role: Role;
+  /**
+   * The ground the bot last chose to hold, and the tick it chose it
+   * (Section 7.35). The search costs about 25 candidate cells, so it runs every
+   * `takePositionIntervalTicks` and the answer is kept between times.
+   */
+  positionGoal: Cell | null;
+  positionGoalTick: number;
   /** The behavior weights of the role, by action kind. */
   roleBehavior: Readonly<Record<string, number>>;
   /** Sub-cell position. The centre of cell (x, y) is (x + 0.5, y + 0.5). */
@@ -234,6 +242,8 @@ export interface SimConfig {
   respawnDelayTicks: number;
   rangeBandCloseMax: number;
   rangeBandMidMax: number;
+  /** The least a weapon keeps from range alone (Section 7.33). */
+  rangeFloorShare: number;
   multiKillWindowTicks: number;
   critMultiplier: number;
   stationaryTicksForCrit: number;
@@ -250,6 +260,17 @@ export interface SimConfig {
   pickupRiskWeight: number;
   /** Two pickup points this close in value count as a tie (Section 7.20.25). */
   pickupTieShare: number;
+  /** What a low cover tile on the line of fire is worth (Section 7.32). */
+  cover: CoverConfig;
+  /** How much a bot values a bearing that takes the target's cover away. */
+  flankWeight: number;
+  /** What each step around the target costs it. */
+  flankTurnCost: number;
+  /** How much a bot values ground that overlooks the conflict zone (7.35). */
+  conflictWeight: number;
+  takePositionIntervalTicks: number;
+  takePositionMargin: number;
+  takePositionRadiusCells: number;
   aggressionReactionDiscount: number;
   aggressionRepositionDiscount: number;
   influenceIntervalTicks: number;
@@ -401,6 +422,7 @@ export function simConfigFromTuning(tuning: Tuning = loadTuning()): SimConfig {
     respawnDelayTicks: tuning.combat.respawnDelayTicks,
     rangeBandCloseMax: tuning.combat.rangeBandCloseMax,
     rangeBandMidMax: tuning.combat.rangeBandMidMax,
+    rangeFloorShare: tuning.combat.rangeFloorShare,
     multiKillWindowTicks: tuning.combat.multiKillWindowTicks,
     critMultiplier: tuning.combat.critMultiplier,
     stationaryTicksForCrit: tuning.combat.stationaryTicksForCrit,
@@ -415,6 +437,18 @@ export function simConfigFromTuning(tuning: Tuning = loadTuning()): SimConfig {
     weaponPrefBonus: tuning.ai.weaponPrefBonus,
     pickupRiskWeight: tuning.ai.pickupRiskWeight,
     pickupTieShare: tuning.ai.pickupTieShare,
+    flankWeight: tuning.ai.flankWeight,
+    flankTurnCost: tuning.ai.flankTurnCost,
+    conflictWeight: tuning.ai.conflictWeight,
+    takePositionIntervalTicks: tuning.ai.takePositionIntervalTicks,
+    takePositionMargin: tuning.ai.takePositionMargin,
+    takePositionRadiusCells: tuning.ai.takePositionRadiusCells,
+    cover: {
+      depthCells: tuning.cover.depthCells,
+      stepFalloff: tuning.cover.stepFalloff,
+      bandFactor: { ...tuning.cover.bandFactor },
+      aiWeight: tuning.cover.aiWeight,
+    },
     aggressionReactionDiscount: tuning.ai.aggressionReactionDiscount,
     aggressionRepositionDiscount: tuning.ai.aggressionRepositionDiscount,
     influenceIntervalTicks: tuning.influence.intervalTicks,
@@ -708,6 +742,8 @@ function makeBot(options: MakeBotOptions): BotState {
     path: [],
     pathGoal: null,
     goalSlotId: null,
+    positionGoal: null,
+    positionGoalTick: -Infinity,
     blockedTicks: 0,
     movedLastTick: false,
     stationaryTicks: 0,

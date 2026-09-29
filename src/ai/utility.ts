@@ -19,6 +19,7 @@
  * - Each tactic has a cost and a benefit.
  * - A bot keeps its action unless a new action scores higher by a margin.
  */
+import { isWalkable, tileAt } from "../arena/types.js";
 import type { Cell } from "../core/types.js";
 import type { Tactics } from "../core/schemas.js";
 import { RANGE_BANDS, type RangeBand, type Weapon } from "../weapons/types.js";
@@ -33,7 +34,11 @@ import {
   rangeWeight,
   weaponWeight,
 } from "../sim/state.js";
-import { hasAmmo } from "../sim/combat.js";
+import { hasAmmo, rangeBandsOf, rangeFalloffOf } from "../sim/combat.js";
+import { bandDistanceOf, rangeAccuracy } from "../weapons/range.js";
+import { clearLine } from "../sim/attacks.js";
+import { coverAgainst, coverBandOf, coverFromVisible } from "../sim/cover.js";
+import { coverageAt } from "../arena/conflict.js";
 import { pickupValue } from "../sim/pickups.js";
 import { controlAt, dangerFor } from "./influence.js";
 import { findPath } from "./navigation.js";
@@ -43,6 +48,7 @@ export type Action =
   | { kind: "Chase"; targetId: string }
   | { kind: "SeekPickup"; slotId: string }
   | { kind: "HoldPosition"; cell: Cell }
+  | { kind: "TakePosition"; cell: Cell }
   | { kind: "Reposition"; band: RangeBand }
   | { kind: "Follow"; teammateId: string }
   | { kind: "Idle" };
@@ -135,10 +141,7 @@ export function healthFraction(state: SimState, bot: BotState): number {
 
 /** The middle distance of a range band, in cells. */
 export function bandDistance(state: SimState, band: RangeBand): number {
-  const { rangeBandCloseMax, rangeBandMidMax } = state.config;
-  if (band === "close") return rangeBandCloseMax / 2;
-  if (band === "mid") return (rangeBandCloseMax + rangeBandMidMax) / 2;
-  return rangeBandMidMax * 1.25;
+  return bandDistanceOf(band, rangeBandsOf(state));
 }
 
 /**
@@ -390,9 +393,15 @@ function safety(state: SimState, bot: BotState, cell: Cell): number {
  * How much the cell that a bot stands on is worth holding, from about 0.2 to 1.
  *
  * A cell is worth holding when a pickup point is near it, when the team holds
- * the ground around it, and when it is not itself dangerous. This is the
- * "contested cell" of Section 7.2 step 5, measured on the grid: the arena has
- * no macro graph until M7.
+ * the ground around it, when low cover screens it from the enemies in sight,
+ * and when it is not itself dangerous. This is the "contested cell" of
+ * Section 7.2 step 5, measured on the grid: the arena has no macro graph until
+ * M7.
+ *
+ * The cover term is what makes an Overwatch bot hold a shielded line instead of
+ * the first cell a pickup run left it on (Section 7.32). It is worth nothing
+ * with no enemy in sight, by the same rule `contactFactor` uses: cover against
+ * nobody is not cover.
  */
 export function positionValue(state: SimState, bot: BotState, cell: Cell): number {
   let nearestPickup = 0;
@@ -406,7 +415,10 @@ export function positionValue(state: SimState, bot: BotState, cell: Cell): numbe
   const friendly = bot.teamId === "A" ? control : -control;
   const danger = dangerFor(state, bot, cell);
 
-  const value = 0.2 + nearestPickup + Math.max(0, friendly) * 0.1 - Math.min(0.4, danger * 0.05);
+  const shielded = coverFromVisible(state, bot, cell) * state.config.cover.aiWeight;
+
+  const value =
+    0.2 + nearestPickup + shielded + Math.max(0, friendly) * 0.1 - Math.min(0.4, danger * 0.05);
   return Math.max(0.1, Math.min(1.4, value * contactFactor(state, bot)));
 }
 
@@ -561,6 +573,26 @@ export function scoreActions(state: SimState, bot: BotState): ScoredAction[] {
     tactics.holdPosition * 2,
   );
 
+  // TakePosition: walk to ground that overlooks the conflict zone
+  // (Section 7.35).
+  //
+  // Benefit: the bot ends up where the fight will be, with a sightline over it.
+  // Cost: it is not fighting or taking items while it walks, and the ground it
+  // leaves may be the ground it needed.
+  //
+  // It answers to the same tactic as HoldPosition, because they are two halves
+  // of one idea: `holdPosition` says how much a bot values ground at all. An
+  // Overwatch bot carries 0.75 of it and a Tank 0.3, so the role that needs a
+  // sightline goes looking for one and the role that needs a fight does not.
+  const ground = bestGround(state, bot);
+  if (ground) {
+    push(
+      { kind: "TakePosition", cell: ground },
+      (base["takePosition"] ?? 1) * groundValue(state, bot, ground),
+      tactics.holdPosition * 2,
+    );
+  }
+
   // Follow: a teammate is far away (cohesion).
   const mate = nearestTeammate(state, bot);
   if (mate) {
@@ -570,6 +602,99 @@ export function scoreActions(state: SimState, bot: BotState): ScoredAction[] {
   }
 
   return scored;
+}
+
+/**
+ * The bearings and the distances a bot looks along for better ground.
+ *
+ * Eight bearings at three distances, plus the cell it stands on, so 25
+ * candidates. The pattern is fixed and holds no RNG, and it is written as
+ * rotations of a unit vector rather than angles for the reason of
+ * Section 7.32.8: a mirrored input must give an exactly mirrored output.
+ */
+const SCAN_BEARINGS: readonly { x: number; y: number }[] = Array.from(
+  { length: 8 },
+  (_unused, i) => ({ x: Math.cos((i * Math.PI) / 4), y: Math.sin((i * Math.PI) / 4) }),
+);
+const SCAN_SHARES: readonly number[] = [0.35, 0.7, 1];
+
+/**
+ * What a cell is worth to stand on and shoot from (Sections 7.35 and 7.36.3).
+ *
+ * Three terms, and the first is the new one:
+ *
+ * - **What it overlooks, at a range this weapon is good at.** The conflict field
+ *   holds the share of the zone a cell sees in each band, and the range curve of
+ *   Section 7.33 says what the weapon keeps at that band's distance. Multiplying
+ *   the two asks the question that matters: not "how much of the fight can I
+ *   see" but "how much of the fight can I see **from somewhere I can hit**".
+ *
+ *   A flat count was the defect of Section 7.36.2. The cell that sees the most
+ *   contested ground is one in the middle of it, 8 to 10 cells from what it
+ *   watches, so a flat count named the knife fight as the best ground in the
+ *   arena. A marksman now scores that cell at about 0.15 of its worth and a
+ *   ridge overlooking the zone at 18 cells at about 0.89 of it; an assault
+ *   weapon reads the same two cells the other way round.
+ * - **What shields it.** The cover it has from the enemies in sight
+ *   (Section 7.32.4).
+ * - **What threatens it.** The danger map.
+ */
+export function groundValue(state: SimState, bot: BotState, cell: Cell): number {
+  const bands = rangeBandsOf(state);
+  const falloff = rangeFalloffOf(state);
+  let overlook = 0;
+  for (const band of RANGE_BANDS) {
+    const share = coverageAt(state.map, cell.x, cell.y, band);
+    if (share <= 0) continue;
+    overlook += share * rangeAccuracy(bot.weapon, bandDistanceOf(band, bands), falloff);
+  }
+  overlook *= state.config.conflictWeight;
+  const shielded = coverFromVisible(state, bot, cell) * state.config.cover.aiWeight;
+  const danger = Math.min(0.4, dangerFor(state, bot, cell) * 0.05);
+  return Math.max(0, overlook + shielded - danger);
+}
+
+/**
+ * The best ground within reach, or `null` when the bot already stands on it.
+ *
+ * The answer is kept on the bot for `takePositionIntervalTicks`, because the
+ * search costs 25 candidate cells and a bot decides every tick.
+ *
+ * A candidate must beat the current cell by `takePositionMargin`. Without a
+ * margin a bot walks for a rounding difference, arrives, finds the cell it left
+ * is now better by the same rounding, and walks back.
+ */
+export function bestGround(state: SimState, bot: BotState): Cell | null {
+  const { config } = state;
+  if (state.tick - bot.positionGoalTick < config.takePositionIntervalTicks) {
+    return bot.positionGoal;
+  }
+  bot.positionGoalTick = state.tick;
+
+  const here = botCell(bot);
+  const floor = groundValue(state, bot, here) * config.takePositionMargin;
+  let best: Cell | null = null;
+  let bestValue = floor;
+
+  for (const share of SCAN_SHARES) {
+    const reach = config.takePositionRadiusCells * share;
+    for (const bearing of SCAN_BEARINGS) {
+      const cell = {
+        x: Math.min(state.map.width - 1, Math.max(0, Math.floor(here.x + 0.5 + bearing.x * reach))),
+        y: Math.min(state.map.height - 1, Math.max(0, Math.floor(here.y + 0.5 + bearing.y * reach))),
+      };
+      if (cell.x === here.x && cell.y === here.y) continue;
+      if (!isWalkable(tileAt(state.map, cell.x, cell.y))) continue;
+      const value = groundValue(state, bot, cell);
+      if (value > bestValue) {
+        bestValue = value;
+        best = cell;
+      }
+    }
+  }
+
+  bot.positionGoal = best;
+  return best;
 }
 
 /**
@@ -682,19 +807,117 @@ function pathTo(state: SimState, bot: BotState, to: Cell): boolean {
 }
 
 /**
- * The cell that holds the bot at `wanted` distance from `target`.
- * It walks along the line between the two bots.
+ * How far around the target a bot will look for a better bearing.
+ *
+ * Seven candidates: the line it already stands on, and three steps of 45 degrees
+ * to each side. The geometry is fixed and needs no tuning number. What the bot
+ * does with the candidates is tuned, by `ai.flankWeight` and `ai.flankTurnCost`.
+ *
+ * **45 degrees and not 30, because 30 clears nothing.** Cover that shields a bot
+ * sits within `cover.depthCells` of it, which in practice means the cell next to
+ * it, and a cell next to a bot subtends about 45 degrees seen from that bot. A
+ * 30-degree turn moves the far end of the line of fire a long way and still
+ * enters the target through the same neighbour, so it reads the same cover tile
+ * and gains nothing for the walk. The probe of Section 7.32.8 measured it: every
+ * 30-degree candidate scored the same shield as the straight line.
+ *
+ * Each entry holds the turn as a **rotation of the vector**, not as an angle to
+ * add to a bearing. The mirror test of Section 7.20.23 is why. A rotation applies
+ * `cos` and `sin` as constants, so a mirrored input gives an exactly mirrored
+ * output: negation, multiplication and addition are all sign-symmetric in IEEE
+ * 754. `Math.cos(bearing + Math.PI)` is not exactly `-Math.cos(bearing)`, and
+ * the last bit of difference reached the positions, then an area damage share,
+ * then the health of a bot. Team A and team B stopped being bit-identical.
  */
-function cellAtRange(state: SimState, bot: BotState, target: BotState, wanted: number): Cell {
+const FLANK_TURNS: readonly { steps: number; cos: number; sin: number }[] = [0, 1, -1, 2, -2, 3, -3]
+  .map((steps) => ({
+    steps: Math.abs(steps),
+    cos: Math.cos((steps * Math.PI) / 4),
+    sin: Math.sin((steps * Math.PI) / 4),
+  }));
+
+/**
+ * The cell at `wanted` distance from `target`, on the bearing `unit` turned by
+ * `turn`.
+ *
+ * `unit` points from the target to the bot, and it must be a unit vector.
+ */
+function cellOnRing(
+  state: SimState,
+  target: BotState,
+  unit: { x: number; y: number },
+  turn: { cos: number; sin: number },
+  wanted: number,
+): Cell {
+  const x = unit.x * turn.cos - unit.y * turn.sin;
+  const y = unit.x * turn.sin + unit.y * turn.cos;
+  return {
+    x: Math.min(state.map.width - 1, Math.max(0, Math.floor(target.pos.x + x * wanted))),
+    y: Math.min(state.map.height - 1, Math.max(0, Math.floor(target.pos.y + y * wanted))),
+  };
+}
+
+/**
+ * Where to stand to fight `target`: at `wanted` distance, on the best bearing.
+ *
+ * Before cover existed this was one cell — the point at `wanted` distance along
+ * the line the two bots already stood on. With cover, the bearing decides the
+ * fight (Section 7.32), so the bot compares the bearings it could take:
+ *
+ * - **Take the cover away.** A bearing where the target's low cover no longer
+ *   lies between them is worth `ai.flankWeight`. This is what makes a move
+ *   around an enemy pay: the same tile that stopped half the shots from the
+ *   south stops none from the east.
+ * - **Keep its own.** A bearing that puts cover between the bot and the target
+ *   is worth `cover.aiWeight`.
+ * - **Do not orbit.** Each step off the line it already holds costs
+ *   `ai.flankTurnCost`, so a bot walks around an enemy for a reason and not out
+ *   of habit.
+ *
+ * A bearing with no clear shot at the target scores nothing, because a firing
+ * position that cannot fire is not one.
+ */
+function firingCell(state: SimState, bot: BotState, target: BotState, wanted: number): Cell {
+  const { config } = state;
   const dx = bot.pos.x - target.pos.x;
   const dy = bot.pos.y - target.pos.y;
-  const distance = Math.hypot(dx, dy) || 1;
-  const x = target.pos.x + (dx / distance) * wanted;
-  const y = target.pos.y + (dy / distance) * wanted;
-  return {
-    x: Math.min(state.map.width - 1, Math.max(0, Math.floor(x))),
-    y: Math.min(state.map.height - 1, Math.max(0, Math.floor(y))),
-  };
+  const span = Math.hypot(dx, dy) || 1;
+  const unit = { x: dx / span, y: dy / span };
+  const from = botCell(target);
+
+  // What a full screen is worth against each weapon, at the wanted distance.
+  const mineCosts = config.cover.bandFactor[coverBandOf(state, wanted, bot.weapon.attackType)];
+  const theirsCosts =
+    config.cover.bandFactor[coverBandOf(state, wanted, target.weapon.attackType)];
+
+  const straight = FLANK_TURNS[0] as { steps: number; cos: number; sin: number };
+  let best = cellOnRing(state, target, unit, straight, wanted);
+  let bestScore = -Infinity;
+
+  for (const turn of FLANK_TURNS) {
+    const cell = cellOnRing(state, target, unit, turn, wanted);
+    if (!isWalkable(tileAt(state.map, cell.x, cell.y))) continue;
+    const centre = { x: cell.x + 0.5, y: cell.y + 0.5 };
+    if (!clearLine(state, centre, target.pos)) continue;
+
+    // What the target keeps from this bearing, and what the bot gains — each
+    // priced by the weapon that has to get through it, at the distance the bot
+    // means to fight at. A bot holding a blast has nothing to flank, because a
+    // blast goes over a low wall (Section 7.32.7), and a bot facing one gains
+    // little by standing behind one.
+    const theirs = coverAgainst(state.map, config.cover, from, cell) * mineCosts;
+    const mine = coverAgainst(state.map, config.cover, cell, from) * theirsCosts;
+    const score =
+      (1 - theirs) * config.flankWeight +
+      mine * config.cover.aiWeight -
+      turn.steps * config.flankTurnCost;
+
+    if (score > bestScore) {
+      bestScore = score;
+      best = cell;
+    }
+  }
+  return best;
 }
 
 /**
@@ -722,7 +945,7 @@ export function applyAction(state: SimState, bot: BotState, action: Action): voi
         bot.path = [];
         return;
       }
-      if (!pathTo(state, bot, cellAtRange(state, bot, target, wanted))) bot.path = [];
+      if (!pathTo(state, bot, firingCell(state, bot, target, wanted))) bot.path = [];
       return;
     }
     case "Chase": {
@@ -745,6 +968,19 @@ export function applyAction(state: SimState, bot: BotState, action: Action): voi
     case "Follow": {
       const mate = findBot(state, action.teammateId);
       if (!mate?.alive || !pathTo(state, bot, botCell(mate))) bot.path = [];
+      return;
+    }
+    case "TakePosition": {
+      const at = botCell(bot);
+      if (at.x === action.cell.x && at.y === action.cell.y) {
+        bot.path = [];
+        return;
+      }
+      if (!pathTo(state, bot, action.cell)) {
+        // Nothing reaches it, so do not choose it again until the next search.
+        bot.positionGoal = null;
+        bot.path = [];
+      }
       return;
     }
     case "HoldPosition":

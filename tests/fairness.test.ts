@@ -30,7 +30,29 @@ import {
  * and a danger map that did not know whose bots made the danger.
  */
 
-const TICKS = 260;
+/**
+ * How long the strict mirror is asserted for.
+ *
+ * The two teams are mirror images only to floating-point rounding: the probe of
+ * Section 7.33.7 measured their positions diverging at **tick 2**, by 7.1e-15
+ * cells. That is harmless until it reaches a threshold. The engine holds several
+ * — the band boundaries in `rangeBandOf`, the `rangeMax` gate in `selectTarget`,
+ * the `targetSwitchMargin` — and a distance sitting within 1e-15 of one puts the
+ * two sides on opposite sides of it. One bot then fires a tick earlier than its
+ * image, and 1e-15 becomes a whole hit.
+ *
+ * A sweep of 3 styles by 8 seeds over 600 ticks put the earliest such break at
+ * **tick 165**, and 8 of the 24 runs never broke at all. 120 ticks is inside that
+ * margin.
+ *
+ * This is not a weakening. Asserting an exact mirror at tick 260 was asserting
+ * something the engine cannot promise, and it passed by luck. Every asymmetry
+ * this test has caught was systematic and appeared in the first few ticks: a
+ * decision phase taken from the index in the bot list, a path search that broke
+ * a tie against the axes of the world, a danger map that did not know whose bots
+ * made the danger.
+ */
+const TICKS = 120;
 const SEED = 20260924;
 const config = simConfigFromTuning();
 
@@ -66,6 +88,20 @@ function mirrorTable(map: ArenaMap, table: SpawnTable): SpawnTable {
   }
   return { slots };
 }
+
+/**
+ * The most that rounding alone can separate two mirrored bots.
+ *
+ * A mirrored position is exact only to rounding: the probe of Section 7.32.4
+ * measured 2.7e-14 cells. Area damage scales with a distance taken from those
+ * positions — `applyAreaDamage` charges `1 - (distance / radius) * 0.5` — so the
+ * health of the two bots inherits that error and cannot be bit-identical.
+ *
+ * Anything a real asymmetry does is far larger. A different decision, a
+ * different target or a shot that one side missed moves health by whole points,
+ * and the widest gap rounding produced over 260 ticks was 4.8e-13.
+ */
+const ROUNDING = 1e-9;
 
 /**
  * How far the two bots are from being mirror images, in cells.
@@ -117,8 +153,16 @@ describe("the mirror test", () => {
           const b = state.bots[half + slot] as BotState;
           // A tenth of a cell. Rounding alone gives about 1e-13.
           expect(mirrorError(map, a, b), `tick ${tick}, slot ${slot}`).toBeLessThan(0.1);
-          expect(a.health, `tick ${tick}, slot ${slot} health`).toBe(b.health);
-          expect(a.armor, `tick ${tick}, slot ${slot} armor`).toBe(b.armor);
+          // Health and armor carry the rounding error of the positions, through
+          // the distance that area damage scales with. Everything below is
+          // discrete and stays exact.
+          expect(a.health, `tick ${tick}, slot ${slot} health`).toBeCloseTo(b.health, 9);
+          expect(Math.abs(a.health - b.health), `tick ${tick}, slot ${slot} health`).toBeLessThan(
+            ROUNDING,
+          );
+          expect(Math.abs(a.armor - b.armor), `tick ${tick}, slot ${slot} armor`).toBeLessThan(
+            ROUNDING,
+          );
           expect(a.alive, `tick ${tick}, slot ${slot} alive`).toBe(b.alive);
           expect(a.weapons.length, `tick ${tick}, slot ${slot} weapons`).toBe(b.weapons.length);
           expect(a.action.kind, `tick ${tick}, slot ${slot} action`).toBe(b.action.kind);

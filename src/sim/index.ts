@@ -16,6 +16,15 @@ export {
 } from "./combat.js";
 export { damageBot, applyDot } from "./damage.js";
 export {
+  coverAgainst,
+  coverBandOf,
+  coverFromVisible,
+  coverSave,
+  coverSaveAt,
+  splashesPastCover,
+  type CoverConfig,
+} from "./cover.js";
+export {
   applyAreaDamage,
   applyConeDamage,
   applyDots,

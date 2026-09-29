@@ -3095,6 +3095,1370 @@ The role and the team are not in the event log, so `roundBrief` takes the bots
 as an option. `state.bots` fits it: the same object already carries the contact
 counters of Section 7.22, so one option replaced two.
 
+## 7.28 The first composition sweep: bastion
+
+3000 rounds, 3 generated `bastion` arenas, every multiset of three roles from
+three — ten compositions, the whole decision space. `useRoleTactics` is set, so
+the roles own the tactics and the table measures what a player actually
+chooses. Commit `8225b209`, data `1injtqz`, seed 20260928.
+
+### 7.28.1 Compositions matter now, and by a lot
+
+| Composition | Win rate | | Composition | Win rate |
+|---|---:|---|---|---:|
+| 1T2S | **68.0 ±2.0** | | 2T1O | 48.8 ±2.0 |
+| 2T1S | 66.8 ±1.9 | | 1O2S | 46.5 ±2.0 |
+| 3T | 65.7 ±1.9 | | 1T2O | 38.7 ±2.0 |
+| 3S | 61.2 ±2.0 | | 2O1S | 33.2 ±1.9 |
+| 1T1O1S | 53.8 ±2.0 | | 3O | **17.3 ±1.5** |
+
+**A spread of 50.7 points.** The old table of Section 7.20.13 read 52.8 / 48.8 /
+48.5 — a spread of 4.3 — because it measured the six behaviour weights alone
+(Section 7.26). Giving the roles their tactics back turned a rounding error
+into the main decision of the game.
+
+### 7.28.2 It is a dominance order, not a cycle
+
+The matchup matrix has no rock-paper-scissors in it. The top four are inside
+noise of each other and beat everything below them:
+
+    against      3T  2T1S  1T2S    3S  1T1O1S  2T1O  1O2S  1T2O  2O1S    3O
+    3T           50    48    47    55      70    68    62    87    80    90
+    2T1S         52    50    53    53      60    67    72    80    90    92
+    3S           45    47    43    50      65    58    65    80    73    85
+    3O           10     8     8    15       8    12    13    25    23    50
+
+One number explains the whole table:
+
+| Overwatch in the team | Win rate |
+|---|---:|
+| 0 | 65.4 ±1.0 |
+| 1 | 49.7 ±1.2 |
+| 2 | 35.9 ±1.4 |
+| 3 | 17.3 ±1.5 |
+
+**About sixteen points for each overwatch, in a straight line.** Nothing else
+in the table needs reading.
+
+### 7.28.3 The reason is legible, and it is the map
+
+`bastion` takes **5.7 % of its kills at long range** and 36.7 % at close.
+`overwatch` ranks `long > mid > close` and reaches for marksman weapons. It is
+playing for a band that this ground barely has.
+
+The role is not broken — it plays a coherent game and loses it. The tempo
+signatures of the mirror matchups say so, and they are the acceptance test of
+Section 7.26 passing:
+
+| Both teams | ticks | kills | close | mid | long | contact | kill gap |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 3T | 2692 | 27.6 | **58 %** | 39 % | 2 % | 39 % | 4.4 s |
+| 3S | 2811 | 27.5 | 17 % | **81 %** | 2 % | 39 % | 4.6 s |
+| 1T1O1S | 2793 | 24.5 | 33 % | 62 % | 5 % | 35 % | 5.2 s |
+| 3O | 3208 | 23.2 | 1 % | 52 % | **46 %** | **69 %** | 5.5 s |
+
+Three roles, three different games. An overwatch team holds sightlines — 69 %
+of its living ticks are spent with an enemy in view, against 39 % for a tank
+team — and it still kills the least and takes the longest. **A role that two
+teams can play is not a label.**
+
+### 7.28.4 What this table is not
+
+- **One map.** `bastion` is the close-quarters style. An overwatch *should* be
+  weak here. The question this sweep cannot answer is whether it is strong on
+  `openfield`, which takes five times the long-range share. Until that runs, we
+  know one half of a specialisation and cannot tell it from a weak role. **TBD**
+- **The matchup cells are thin.** 60 rounds a cell, ±6.5. Read the structure,
+  not a cell.
+- **A 2-point side bias remains.** Team A won 47.9 ±0.9 over the batch. Every
+  composition played 300 rounds as A and 300 as B, so it cancels in the column
+  above, but it is 2.3 standard errors from fair and it is not gone.
+
+### 7.28.5 The balance judgement
+
+A choice that loses five rounds in six is not a choice, it is a trap. Even if
+`openfield` reverses it exactly, 17.3 % against 68.0 % is too wide for a player
+to be asked to pick blind.
+
+**Do not tune it from this table alone.** Run the same sweep on `openfield`
+first. If `overwatch` tops that one, the roles are specialised correctly and
+only the magnitude needs narrowing; if it loses there too, the role is weak and
+its weapon and range rankings are the thing to change. Tuning now would be
+fitting one map. TBD
+
+## 7.29 Three grounds: the long band does not exist
+
+`cavern` and `openfield` ran the same sweep as Section 7.28: 3000 rounds, 3
+generated arenas, all ten compositions, `useRoleTactics` set. Commit
+`8225b209`, data `1injtqz`.
+
+### 7.29.1 Overwatch loses on every ground, by the same amount
+
+| Overwatch in the team | bastion | cavern | openfield |
+|---|---:|---:|---:|
+| 0 | 65.4 ±1.0 | 64.5 ±1.0 | 63.5 ±1.0 |
+| 1 | 49.7 ±1.2 | 50.2 ±1.2 | 50.4 ±1.2 |
+| 2 | 35.9 ±1.4 | 33.7 ±1.4 | 36.2 ±1.4 |
+| 3 | 17.3 ±1.5 | 24.2 ±1.7 | 22.2 ±1.7 |
+
+Section 7.28 asked whether `overwatch` is weak or merely specialised for ground
+that `bastion` does not have. **`openfield` answers it: the role is weak.** The
+penalty is the same on the open map as on the closed one.
+
+### 7.29.2 Because the long band is 6 %, 1 % and 7 %
+
+| Style | close | mid | **long** |
+|---|---:|---:|---:|
+| bastion | 37 % | 58 % | **6 %** |
+| cavern | 44 % | 55 % | **1 %** |
+| openfield | 34 % | 60 % | **7 %** |
+
+`openfield` was supposed to be the long-range map. It takes **7 %** of its
+kills past 20 cells. There is no ground in this game where the long band is a
+real place to fight.
+
+**Three numbers explain it, and two of them are the same number:**
+
+    perception.sightRadiusCells   20
+    combat.rangeBandMidMax        20     <- the long band starts here
+    budget.rangeValueCapCells     20
+
+**The long band begins exactly where a bot stops being able to see.** A bot
+cannot acquire a target it cannot see, so the band above 20 cells is reachable
+only by a shot already in the air, by area damage, or by a target that walks
+out of a fight. That is the 1 to 7 %.
+
+The weapon budget already knows this. `bandShare` reads `close 0.50, mid 0.48,
+long 0.02`, and `fixedCost` caps the value of reach at the same 20 cells, with
+a comment that says "the long band is 1 % of shots". **The data has known since
+the weapon work that the long band is 2 % of the game.**
+
+`overwatch` was then written to rank that band **first**, and to reach for
+`marksman` weapons, whose base reach is 38 to 58 cells — nearly three times the
+sight radius. The role is not mis-tuned against one map. It is aimed at a band
+that the engine gives 2 % of.
+
+This is the defect of Section 7.20.18 once more: **a number that does not mean
+what its name says.** "Long range" names a band that vision cannot reach.
+
+### 7.29.3 The other two roles do adapt to the ground
+
+| Style | 3T | 3S | 3T − 3S |
+|---|---:|---:|---:|
+| bastion | 65.7 | 61.2 | **+4.5** |
+| cavern | 63.3 | 62.2 | +1.1 |
+| openfield | 58.8 | 68.7 | **−9.9** |
+
+A 14.4-point swing between the closed map and the open one, in the direction
+the names promise: the tank is best in corridors, the skirmisher on open
+ground. **The design works for the two roles that play bands the game actually
+has.** `1T2S` also leads `bastion` and `cavern` while `3S` leads `openfield`,
+so the best answer changes with the ground.
+
+### 7.29.4 The side bias, watched on purpose
+
+| Measure | bastion | cavern | openfield |
+|---|---:|---:|---:|
+| Team A, every round | 47.9 ±0.9 | 50.1 ±0.9 | 50.5 ±0.9 |
+| Team A, mirror matchups only | 48.2 ±2.9 | 47.3 ±2.9 | 47.3 ±2.9 |
+
+The second row is the cleaner instrument: both teams play the **same**
+composition, so nothing but the side can move it. Every composition also played
+exactly 300 rounds as A and 300 as B, so a side bias cancels in the tables
+above whatever it is.
+
+Over three styles the whole-batch figure is 49.5 ±0.5, which is fair. `bastion`
+alone reads 2.3 standard errors low and no other style does; with three styles
+that is weak evidence, and it is **not** enough to act on. Watch it, do not
+chase it.
+
+### 7.29.5 What to change, and what not to
+
+The composition table is not the thing to tune. **The band structure is.**
+Three ways to give the long band a reason to exist, none of them measured yet:
+
+1. **Move the boundary below the sight radius.** `rangeBandMidMax` under 20
+   makes the long band ground a bot can see and shoot.
+2. **Let a bot see further than it shoots comfortably.** A larger
+   `sightRadiusCells` with the boundary where it is.
+3. **Accept that there are two bands, not three**, and rewrite `overwatch`
+   around holding a mid-range sightline instead of a long one.
+
+Whichever, `bandShare`, `rangeValueCapCells` and every weapon tier were tuned
+against a 2 % long band and would all need re-measuring.
+
+Section 7.30 does option 1 and option 2 together, from a measurement of the
+ground rather than by hand. Section 7.31 records why option 3 is the wrong
+reading: Overwatch loses for a second reason, which is that no bot can choose
+where to stand.
+
+`tools/analyse-compositions.py` reads the round CSVs and prints every table in
+this section.
+
+## 7.30 The range bands, derived from the ground
+
+Section 7.29.5 listed three ways to give the long band a reason to exist and
+measured none of them. This measures the ground first, and then sets the
+boundaries from what the measurement says.
+
+### 7.30.1 The method
+
+`tools/measure-sightlines.ts` runs no rounds. For each arena style it generates
+a sample of arenas, takes an even spread of floor cells from each, and asks of
+every pair of them: does a straight line between the two cell centres reach,
+with only a wall as a blocker? That is the rule `blocksSight` and `clearLine`
+use, so what the tool counts as visible is what a weapon can shoot along.
+
+It then reports the distribution of those distances. The question the bands
+must answer is "how far apart are two bots that can see each other", and this
+is that number, measured on the real ground instead of assumed.
+
+```
+npx tsx tools/measure-sightlines.ts [arenas-per-style]
+```
+
+### 7.30.2 What the ground says
+
+Six arenas a style, 260 cells an arena, 202 020 pairs a style:
+
+| style | visible pairs | p50 | p75 | p90 | p95 | p99 | max |
+|---|---|---|---|---|---|---|---|
+| bastion | 10.6 % | 7.1 | 11.4 | 17.0 | 21.4 | 31.1 | 56.5 |
+| openfield | 21.5 % | 11.0 | 17.1 | 24.2 | 29.4 | 41.3 | 57.1 |
+| cavern | 19.7 % | 9.2 | 14.3 | 20.2 | 24.1 | 32.9 | 54.1 |
+| **all three** | | **9.4** | **15.0** | **21.5** | **26.0** | **37.1** | **57.1** |
+
+Two numbers decide everything:
+
+- **The upper quartile of real sight lines is 15.0 cells.** One quarter of the
+  pairs that can see each other are further apart than that.
+- **p95 is 26.0 cells.** Beyond that, a pair that can see each other is rare
+  on every ground.
+
+The old `rangeBandMidMax` of 20 sat at about the 88th percentile. It was also
+exactly `sightRadiusCells`, so the long band began at the same cell where
+vision ended. That is the defect of Section 7.29.2, stated in one line.
+
+### 7.30.3 What changed
+
+| number | was | now | why |
+|---|---|---|---|
+| `perception.sightRadiusCells` | 20 | 26 | p95 of visible pairs. A bot sees as far as the ground allows, not less. |
+| `combat.rangeBandMidMax` | 20 | 15 | The upper quartile. The long band now holds the top quarter of sight lines instead of the top eighth. |
+| `budget.rangeValueCapCells` | 20 | 26 | The budget must price reach up to the distance a bot can now see. Below the sight radius it charges nothing for the reach a marksman actually uses. |
+| `value.bandShare` | close .50, mid .48, long .02 | close .41, mid .34, long .25 | Set from the geometry above, as a prior. |
+
+`rangeBandCloseMax` stays at 8. p50 is 9.4, so the close band already holds
+about half of every sight line, which is what it should hold.
+
+The three numbers moved together on purpose. `sightRadiusCells`,
+`rangeBandMidMax` and `rangeValueCapCells` were all 20, and each one meant
+something different by it. They are now three separate facts: how far a bot
+sees, where the long band begins, and how far the budget pays for reach.
+
+### 7.30.4 What is still a prior, not a measurement
+
+`bandShare` was set from **geometry** — the share of visible pairs that fall
+in each band. That is not the same as the share of **kills** in each band,
+because a bot chooses its range. The geometric figure is the right starting
+point and the wrong finishing point. Re-measure `bandShare` from the kill
+bands of a batch once the boundaries settle, and re-run the weapon tier
+measurement of Section 7.14 against it. **TBD**
+
+The test "weighs a band by how often the arena fires in it" in
+`tests/utility.test.ts` used to encode the old world — it asserted that the
+long band was 1 % of shots. It now derives the crossover point from
+`bandShare` and `rangePrefBias` at run time, so it tests the mechanism and
+cannot go stale when the numbers move again.
+
+### 7.30.5 The bands moved. The win rate did not.
+
+Two batches of 1200 rounds over 3 arenas, `data/batch-roles.json`, seed 20260928.
+
+**The band moved exactly as the derivation said it would:**
+
+| kills by band | openfield before | openfield after | cavern before | cavern after |
+|---|---|---|---|---|
+| close | 45 % | 36.7 % | 56 % | 47.0 % |
+| mid | 48 % | 37.8 % | 43 % | 39.6 % |
+| long | **7 %** | **25.5 %** | **1 %** | **13.4 %** |
+
+**The Overwatch penalty did not move at all:**
+
+| overwatch in the team | openfield before | openfield after | cavern before | cavern after |
+|---|---|---|---|---|
+| 0 | 64 % | 66.4 % | 65 % | 64.3 % |
+| 1 | 50 % | 48.1 % | 50 % | 51.2 % |
+| 2 | 36 % | 33.9 % | 34 % | 34.6 % |
+| 3 | 22 % | 22.7 % | 24 % | 20.0 % |
+
+The mirror rows say the role changed its behaviour and not its result. A 3O
+team on openfield now takes 82 % of its kills at long range, against 3 % at
+close range, which is the role working as designed. It still makes only 16.6
+kills in 3905 ticks, where 3T makes 37.8 in 3303. And its contact share is
+**higher** than 3T's, 34 % against 29 %. So an Overwatch bot sees the enemy
+more of the time, fights at the range it wants, and kills at 37 % of the rate.
+
+Side bias stayed inside the noise: pooled mirror A 46.7 % openfield and 47.5 %
+cavern, each ±4.6.
+
+### 7.30.6 The cause: the budget took back what the band gave
+
+The power budget is zero-sum at a fixed tier. Both changes of Section 7.30.3
+raised the price of reach, so the generator granted less damage to pay for it.
+400 weapon sets, same seeds, old data files against new:
+
+| archetype | mean rangeMax | DPS before | DPS after | change |
+|---|---|---|---|---|
+| marksman | 47.1 | 63.2 | 54.3 | **−14 %** |
+| precision | 32.8 | 53.3 | 53.1 | 0 % |
+| assault | 18.3 | 48.6 | 56.4 | **+16 %** |
+| splash | 14.9 | 37.0 | 42.8 | **+16 %** |
+| heavy | 23.7 | 44.3 | 48.1 | +9 % |
+| denial | 17.5 | 35.1 | 37.2 | +6 % |
+
+Marksman and precision are the two weapons an Overwatch bot reaches for first.
+Assault and splash are the Skirmisher's and the Tank's. So the change cut 14 %
+from the role's own weapon and gave its rivals 6 % to 16 %. The band gain and
+the budget loss cancelled, which is what the batch measured.
+
+Two mechanisms, both in the same direction:
+
+- `bandShare` long .02 → .25 makes a long DPS profile count as valuable, so
+  `costOf` charges more for it and `generateWeapon` grants less raw damage.
+- `rangeValueCapCells` 20 → 26 charges full price for reach out to 26 cells,
+  where 6 of those cells used to cost `rangeValueTailShare`, 45 % of full.
+
+This does not mean the bands were wrong. It means `bandShare` and the tier
+targets are one system and were re-measured only half way, exactly as
+Section 7.30.4 warned.
+
+### 7.30.7 The reach nobody can use
+
+The same table holds a second finding, larger than the first.
+
+**A marksman has a mean `rangeMax` of 47.1 cells, and a bot sees 26.** Twenty
+one cells of its reach cannot be used on any ground, because no target is ever
+visible there. The tail past the cap is charged at `rangeValueTailShare`, so
+the marksman still pays about 9.5 cells of full-price reach for ground that
+does not exist. Precision, at 32.8, pays about 3.
+
+So the generator sells the role a number that the perception system cannot
+honour. Raising `rangeValueCapCells` did not create this; it made the bill
+larger.
+
+**The fix is to stop generating the dead reach, not to price it.** Clamp the
+generated `rangeMax` at or just above `perception.sightRadiusCells`, and the
+budget that the tail consumed returns as damage — to marksman and precision
+first, which are the two weapons Overwatch ranks highest. That is one change,
+it needs no new system, and it is the next thing to measure. **TBD**
+
+## 7.31 What the arena tells the bots: nothing
+
+Section 7.30 fixed a number. This records a structural gap found while looking
+for the next one, because the gap explains the Overwatch result of
+Section 7.29.1 better than the bands do.
+
+### 7.31.1 The arena is measured, and the measurement stops at the report
+
+`measureArena` runs one time after generation and produces 13 numbers. They
+have exactly two readers: `validateArena`, the acceptance rule, and the report
+tables. **A grep of `src/ai/` for `metrics` returns nothing.** `chokepoints`,
+`meanSightline` and `coverDensity` never reach a bot.
+
+Two defects in the measurement itself, which matter if it ever does reach one:
+
+- `sightlineThrough` tests the east–west and north–south runs only. A diagonal
+  sight line does not count. The centre room of a bastion arena is the exact
+  place where the diagonal decides the fight.
+- `countChokepoints` counts **cells**, not doorways: it asks whether removing
+  a cell splits the floor, and above 1200 floor cells it samples and
+  extrapolates. A three-cell doorway counts three times. Hence bastion 13,
+  cavern 17, openfield 0. The figure names no place a bot can stand.
+
+### 7.31.2 A bot has no concept of good ground
+
+At run time a bot knows its own FOV, the pickup list, and the two influence
+maps. `positionValue` is the only function that asks whether a cell is worth
+holding:
+
+```
+0.2 + nearestPickup + max(0, friendly) * 0.1 − min(0.4, danger * 0.05)
+```
+
+Good ground means **near a pickup**. No sight line enters it.
+
+Worse, of the seven actions — `Engage`, `Chase`, `SeekPickup`,
+`HoldPosition`, `Reposition`, `Follow`, `Idle` — **not one moves a bot to
+chosen ground.** `HoldPosition` scores a single cell, the one the bot already
+stands on. `Reposition` needs a visible enemy and only corrects the band.
+Every other move goes to a pickup, an enemy or a teammate.
+
+So an Overwatch bot cannot select a sight line. A high `holdPosition` only
+makes it refuse to leave wherever the last pickup run left it. That is the
+static, out-of-position behaviour seen in play, and no change to the bands
+repairs it.
+
+The fix needs two parts, and the second is the work:
+
+1. A **conflict-zone measure** on the map, computed at generation and attached
+   beside `metrics`: for each floor cell, how many contested cells it sees, by
+   the true line-of-sight rule. `pickupEvenness` in `src/arena/contested.ts`
+   already marks which points are contested.
+2. A **`TakePosition` action** that scores candidate cells inside move range,
+   not only the current cell. Overwatch then weights a cell by contested-tile
+   coverage at long range. Tank and Skirmisher weight the **route** by conflict
+   exposure, which routes them to a safer pickup.
+
+Part 1 without part 2 changes no behaviour, because nothing would read it.
+**TBD**
+
+### 7.31.3 Cover is decorative
+
+`isInCover` has one reader in the whole codebase: `killerInCover` in the `Kill`
+event payload. It changes no hit chance, no damage and no movement cost.
+`blocksSight` treats low cover as clear ground, on purpose. `src/ai/` never
+mentions cover.
+
+So low cover is a glyph and one kill-feed field, and `coverDensity` separates
+the three styles in the report while giving the player nothing.
+
+This is the cheaper of the two levers. Give cover a real effect — a hit-chance
+penalty against a bot in cover, larger at long range than at close range — and
+`positionValue` gains a reason to prefer one cell over another. The arena shape
+then decides where a bot stands, and bastion 11.6 %, cavern 9.8 % and
+openfield 6.8 % cover become three different fights instead of three different
+pictures.
+
+Section 7.32 does this. Cover is directional there, not a proximity bonus: only
+a tile between the two bots counts, so a move around an enemy takes its cover
+away.
+
+## 7.32 Cover, and the reach a bot can use
+
+Section 7.31 found two things that were not mechanics: the reach a weapon sold
+past the sight radius, and cover. This makes both of them real.
+
+### 7.32.1 A weapon cannot reach past what a bot can see
+
+A marksman was generated with a mean `rangeMax` of 47.1 cells while a bot saw
+26. Twenty one cells of that reach could never hold a visible target, and the
+budget still charged about 9.5 cells of full-price reach for them
+(Section 7.30.7).
+
+`budget.rangeHeadroomShare` now caps the generated reach at
+`perception.sightRadiusCells` times 1.15. The headroom is for a shot already in
+the air when the target steps out of sight; past it the reach is ground that
+does not exist.
+
+**A cap the roll always hits is not a cap, it is a constant.** The sniper role
+rolled `rangeMax` over [38, 58] and every draw landed above the cap, so every
+sniper came out with the same reach and the roll meant nothing. The four role
+ranges moved into the world the sight radius defines:
+
+| role | was | now |
+|---|---|---|
+| sniper | [38, 58] | [23, 29] |
+| precise | [26, 40] | [17, 26] |
+| heavy | [18, 32] | [18, 29] |
+| assault | [14, 24] | unchanged |
+
+What the two changes together did to 400 weapon sets on the same seeds:
+
+| archetype | rangeMax before | after | DPS before | after |
+|---|---|---|---|---|
+| marksman | 47.1 | **25.3** | 54.3 | **56.6** |
+| precision | 32.8 | 21.3 | 53.1 | 54.9 |
+| heavy | 23.7 | 22.2 | 48.1 | 48.3 |
+| assault | 18.3 | 18.3 | 56.4 | 56.3 |
+| splash | 14.9 | 12.7 | 42.8 | 43.2 |
+| denial | 17.5 | 16.7 | 37.2 | 37.4 |
+
+A marksman now carries the DPS of an assault weapon and 7 more cells of reach,
+where before it carried less DPS and 21 cells of reach it could not use.
+
+### 7.32.2 `rangeMax` also sets the accuracy curve, and that is a problem
+
+`hitChance` charges `1 - (distance / weapon.rangeMax) * distanceFalloff`. The
+divisor is the weapon's own reach, so **a weapon is rewarded for claiming reach
+it cannot use**: the inflated `rangeMax` bought a flat accuracy curve inside the
+range it really fought at.
+
+| distance | old marksman, reach 47.1 | new marksman, reach 25.3 |
+|---|---|---|
+| 10 cells | 0.873 | 0.763 |
+| 15 cells | 0.809 | 0.644 |
+| 20 cells | 0.745 | **0.526** |
+| 25 cells | 0.682 | **0.407** |
+
+So the cap gave the marksman 4 % more DPS and took 29 % of its hit chance at 20
+cells. This is the same defect as the bands of Section 7.30: one number carrying
+two meanings, and the name declaring only one of them.
+
+Section 7.33 fixes this, and not by dividing by a common scale. The deeper fault
+was that the accuracy curve fell from the **muzzle** rather than from the
+distance a weapon is built for, so every weapon was at its best at point-blank
+range. Effective range is bounded at both ends there.
+
+### 7.32.3 Cover is what lies between you and the shooter
+
+One rule decides everything:
+
+> **The tile a bot stands on shields it from nothing. Only a cover tile on the
+> line of fire counts.**
+
+`coverAgainst` walks the line of fire out of the target toward the shooter and
+reads the first `cover.depthCells` cells of it. A nearer tile is worth more than
+a further one, by `cover.stepFalloff`. A wall ends the walk, because a wall
+already stopped the shot.
+
+This is what makes a move around an enemy pay for itself: the same tile that
+stops most of the shots from the south stops none from the east. It also keeps
+the rule `blocksSight` already stated — a cover tile a bot stands on is a
+shooting position, not a screen.
+
+`cover.bandFactor` then scales the shield by the range band, because a shooter
+far away has little angle over a low wall and a shooter at arm's length has all
+of it:
+
+| band | what one full screen stops |
+|---|---|
+| close | 15 % |
+| mid | 40 % |
+| long | 70 % |
+
+There is no separate ceiling. `coverAgainst` answers at most 1, so `bandFactor`
+is itself the ceiling, and a second number under it only hid the difference
+between the mid band and the long one.
+
+**The roll lives in `damageBot`, and nowhere else.** Every source of damage
+funnels through that one function, so one roll there covers the hitscan, line,
+cone, projectile and area families alike. A roll in `hitChance` would have
+reached the first two and missed the rest, and a roll in both would have charged
+twice. Three consequences follow from the placement:
+
+- `noteIncomingFire` runs **before** the roll. A shot that hits the wall in
+  front of you still tells you that somebody is shooting at you.
+- A hazard tile and a burn are not shielded. They are already on the bot, so
+  cover has nothing to stand between.
+- `damageBot` answers whether the damage landed, and every caller that adds a
+  side effect of its own now reads that answer. A shot cover stopped leaves no
+  burn behind it.
+
+`isInCover` keeps its one job, the `killerInCover` field of the kill feed, and
+its comment now says that it is a report field and not the mechanic. The `Kill`
+event gained `targetCover`, and a `CoverSave` event records every shot that
+cover stopped, with its band, so a batch can measure whether the mechanic does
+anything at all.
+
+### 7.32.4 What the bots do about it
+
+Cover with no bot playing around it is a tax on both teams and a tactic for
+neither. Two decisions read it:
+
+- **`positionValue` adds the cover a cell has from the enemies in sight**, times
+  `cover.aiWeight`. It takes the **worst** of them and not the mean, because the
+  enemy you are open to is the one that shoots you. With no enemy in sight it is
+  worth nothing, by the same rule `contactFactor` uses: cover against nobody is
+  not cover. This is what lets an Overwatch bot hold a shielded line instead of
+  the cell a pickup run left it on.
+- **`firingCell` chooses a bearing, not just a distance.** What used to be
+  `cellAtRange` returned one cell: the point at the wanted distance along the
+  line the two bots already stood on. It now compares seven bearings — that line
+  and three turns of 30 degrees to each side — and scores each one by what the
+  target keeps (`ai.flankWeight`), what the bot gains (`cover.aiWeight`), and
+  what the walk costs (`ai.flankTurnCost`, per turn, so a bot flanks for a
+  reason and not out of habit). A bearing with no clear shot scores nothing,
+  because a firing position that cannot fire is not one.
+
+The two AI tests both fail with `ai.flankWeight` and `cover.aiWeight` at zero,
+which is the check that they test the feature and not the scaffolding.
+
+**A turn is a rotation of the vector, never an angle added to a bearing.** The
+first version took `Math.atan2` of the line and added the offset, and the mirror
+test of Section 7.20.23 rejected it: `Math.cos(bearing + Math.PI)` is not
+exactly `-Math.cos(bearing)`. A rotation applies `cos` and `sin` as constants, so
+a mirrored input gives an exactly mirrored output — negation, multiplication and
+addition are all sign-symmetric in IEEE 754. A probe over 8 000 mirrored cell
+pairs on the three styles reports `coverAgainst` bit-identical on every one.
+
+### 7.32.5 The mirror test was too strict, and it took a data change to show it
+
+With the new role ranges the mirror test failed on cavern: slot 2 health
+2.478950292254808 against 2.4789502922552913, a gap of 4.8e-13 at tick 244.
+
+It is not an asymmetry. The probe says the position gap at that tick is 2.7e-14
+cells, and the damage that diverged came from `source=area`:
+
+```
+Hit source=area weapon=redeemer damage=97.52104970774519 target=A2
+Hit source=area weapon=redeemer damage=97.52104970774471 target=B2
+```
+
+`applyAreaDamage` charges `1 - (distance / radius) * 0.5`, and that distance
+comes from the positions. A mirrored position is exact only to rounding, so any
+damage that scales with a distance **cannot** be bit-identical, and health
+inherits the error. The assertion passed until now only because no area weapon
+had landed inside the sampled ticks of those seeds.
+
+So the test changed, not the simulation: `health` and `armor` are compared
+within 1e-9, and everything discrete — `alive`, `action.kind`, the weapon count,
+the position within a tenth of a cell — stays as it was. A real asymmetry moves
+health by whole points, and the widest gap rounding produced over 260 ticks was
+4.8e-13, so the instrument keeps its teeth.
+
+### 7.32.7 A blast goes over a low wall
+
+Cover that stops everything equally is not a choice, it is a tax. So the answer
+to a bot holding cover at long range is a **splash weapon**: a cone or a burst
+counts as **close range against cover, whatever the real distance**.
+
+| what the shot is | one full screen stops |
+|---|---|
+| a bullet at long range | 70 % |
+| a bullet at mid range | 40 % |
+| a bullet at close range | 15 % |
+| **a blast, at any range** | **15 %** |
+
+The reason is the shape of the shot. A blast does not need a clear line to the
+bot, only to the ground beside it, so the wall it goes over is not a screen.
+Cover still counts for something — a bot pressed against a wall is harder to
+reach even with a blast — but only at the close-range rate.
+
+`SPLASH_ATTACK_TYPES` holds `cone` and `burst`, which is exactly the `splash`
+archetype: `archetypeOf` maps those two to it and nothing else to it. The set is
+keyed on the **attack type** and not the archetype, because the mechanic is the
+shape of the shot rather than the name of the weapon. `tile` is absent because a
+hazard damages through the `hazard` source, which cover never shields at all.
+
+Two places read the same rule, so that no bot plays against a mechanic that does
+not exist:
+
+- `coverFromVisible` prices each visible enemy by the weapon **that enemy
+  holds**. A bot facing a grenadier does not value a screen the grenade ignores.
+- `firingCell` prices the target's cover by the weapon **the bot holds**, and its
+  own cover by the weapon the target holds. A bot carrying a blast has nothing to
+  flank, so it walks straight in. This is what makes `ai.flankWeight` mean "how
+  much the bot values removing the cover penalty it actually suffers", rather
+  than a penalty somebody else suffers.
+
+The `CoverSave` event carries both bands: `rangeBand` is the real distance and
+`coverBand` is what the save was priced at, so a batch can tell the two apart.
+
+### 7.32.8 A 30-degree turn clears nothing
+
+The first turn set was three steps of 30 degrees to each side. It did not work,
+and the probe says why. Against a target with cover on the straight line, every
+30-degree candidate read the **same shield as the straight line**:
+
+```
+steps  0 cell (21,15)  theirs 0.700  score 0.180
+steps  1 cell (24, 3)  theirs 0.700  score 0.060
+steps -1 cell (24,21)  theirs 0.700  score 0.060
+```
+
+Cover that shields a bot sits within `cover.depthCells` of it, which in practice
+means **the cell next to it**, and a cell next to a bot subtends about 45 degrees
+seen from that bot. A 30-degree turn moves the far end of the line of fire a long
+way and still enters the target through the same neighbour. So it read the same
+cover tile, gained nothing, and paid `ai.flankTurnCost` for the walk — which is
+why the straight line kept winning.
+
+At 45 degrees the line enters through the diagonal neighbour instead:
+
+```
+steps  0 cell (21,15)  theirs 0.700  score 0.180
+steps  1 cell (27, 2)  theirs 0.000  score 0.480
+steps -1 cell (27,28)  theirs 0.000  score 0.480
+```
+
+`FLANK_TURNS` is now 45, 90 and 135 degrees to each side. 135 is a long walk and
+it costs three steps, but it is still worth taking when it is the only bearing
+with a clear shot.
+
+The lesson is the one this section keeps repeating: **the resolution of a choice
+has to match the resolution of the thing it acts on.** A turn finer than the grid
+the cover sits on cannot change what the cover does.
+
+### 7.32.6 What is not measured yet
+
+Cover, the reach cap and the role ranges all landed together and none of them
+has a batch behind it. The three questions for the next sweep:
+
+1. Does the Overwatch penalty of Section 7.30.5 move? It should: an Overwatch
+   bot holds still, so it can hold cover, and the Tank and Skirmisher walking at
+   it cross open ground.
+2. Does `CoverSave` fire often enough to matter? `coverDensity` is 11.6 %, 9.8 %
+   and 6.8 % on the three styles, so cover is scattered and not everywhere.
+3. Does a bot flank, or orbit? `ai.flankTurnCost` is the number to watch, and a
+   bot that walks around an enemy without ever firing means it is too low.
+4. Does the splash archetype rise? Section 7.29 measured it losing, and
+   Section 7.32.7 gives it the one job nothing else can do. `CoverSave` carries
+   `coverBand` so the sweep can count the saves a blast was charged close range
+   for.
+
+`bandShare` is still the geometric prior of Section 7.30.4, and the accuracy
+curve of Section 7.32.2 is still coupled to `rangeMax`. Both wait on the same
+sweep. **TBD**
+
+## 7.33 Effective range: one curve, read by everything
+
+Section 7.32.2 found that `rangeMax` carried three jobs and its name declared
+one. Fixing that one number alone would have been a patch. The whole of the
+range machinery needed to become one system, and this is it.
+
+### 7.33.1 There were three range models, and the simulation obeyed the wrong one
+
+| where | what it said | who read it |
+|---|---|---|
+| `roles[*].bandMultiplier` | sniper `{ close 0.5, mid 0.95, long 1.35 }` — worst near, best far | the budget, and the AI through `dpsProfile` |
+| `roles[*].reactionByBand` | sniper `{ close 7-10, mid 4-6, long 1-3 }` — slow to bring to bear near | `effectiveReaction` |
+| `distance / weapon.rangeMax` in `hitChance` | a plain decline from the muzzle — **best** at point-blank range | the simulation |
+
+The first two agreed with each other. The third contradicted them, and the third
+was the only one the simulation obeyed.
+
+So a marksman was priced as a long-range weapon, sent to long range by the AI,
+and handed its **worst** hit chance when it arrived. The role lost by 44 points
+of win rate (Section 7.30.5) and no amount of band tuning could have repaired it,
+because the defect was not in the bands.
+
+### 7.33.2 One statement of where a weapon works
+
+Two numbers on a weapon replace all three models:
+
+- **`optimalRange`** — the distance it is built for, in cells.
+- **`rangeTolerance`** — how far from that distance it stays useful, in cells.
+
+```
+deviation = |distance - optimalRange|
+kept      = 1 - distanceFalloff * (deviation / rangeTolerance)
+accuracy  = clamp(kept, rangeFloorShare, 1)
+```
+
+`src/weapons/range.ts` owns it and holds nothing else. `hitChance` reads it, the
+generator reads it to derive `dpsProfile`, and the budget prices the two numbers
+that produce it. There is no longer a place for two of them to disagree.
+
+`roles[*].bandMultiplier` is **gone**. Four roles times three bands was twelve
+hand-written numbers saying what two numbers now say, and the simulation did not
+read any of the twelve.
+
+`attackTypes[*].bandMultiplier` **stays**, because it says something the curve
+does not: how the **travel** of the shot fares by band. A projectile is easier to
+step out of the way of at long range. That is not "where the weapon works", so
+the two do not overlap.
+
+### 7.33.3 Where each role now works, and the numbers behind it
+
+The role tables name the peak and the width. The attack type moves both by its
+`rangeFactor`, so a cone is built for a short distance **and** is unforgiving
+about it, which is what a cone is.
+
+| role | optimalRange | rangeTolerance |
+|---|---|---|
+| assault | 4 – 9 | 6 – 10 |
+| heavy | 5 – 10 | 5 – 8 |
+| precise | 11 – 16 | 9 – 13 |
+| sniper | 17 – 22 | 6 – 9 |
+
+The sniper's peak sits at 17–22 and not 23–29 because of the measurement of
+Section 7.30.2: the median visible pair of cells is 9.4 apart and p90 is 21.5. A
+weapon built for 26 cells is built for the 92nd percentile of sight lines, which
+is a fight that almost never happens.
+
+`rangeMax` is now **derived, never rolled**: `rangeGateOf` puts it at
+`optimalRange + rangeTolerance * budget.rangeGateTolerances`, floored at the
+close band so nothing is unusable and capped at what a bot can see. A weapon can
+no longer be allowed to fire where its own curve says it cannot hit.
+
+Over 400 weapon sets, what the curve keeps at each distance:
+
+| archetype | 2c | 4c | 8c | 12c | 16c | 20c | 24c | built for |
+|---|---|---|---|---|---|---|---|---|
+| assault | 0.67 | 0.82 | **0.85** | 0.55 | 0.28 | 0.16 | 0.15 | close 80 % |
+| heavy | 0.53 | 0.72 | **0.86** | 0.51 | 0.21 | 0.15 | 0.15 | close 68 % |
+| splash | 0.57 | **0.68** | 0.65 | 0.42 | 0.29 | 0.23 | 0.17 | close 80 % |
+| precision | 0.37 | 0.49 | 0.71 | **0.91** | 0.85 | 0.62 | 0.40 | mid 87 % |
+| marksman | 0.15 | 0.15 | 0.22 | 0.49 | 0.81 | **0.84** | 0.54 | long 100 % |
+| baseline | 0.63 | 0.70 | 0.85 | **1.00** | 0.85 | 0.70 | 0.55 | mid |
+
+Three things to read in that table:
+
+1. **A marksman is at its floor at 2 and 4 cells.** The old rule gave it its best
+   chance there.
+2. **Effective range is bounded at both ends.** Every row rises and then falls.
+3. **The mid-range weapon is the versatile one, and no number says so.**
+   Precision's worst value over 1 to 26 cells is 0.37, where assault's and
+   marksman's both bottom out at the 0.15 floor. Versatility is not a stat: it
+   falls out of the geometry, because a peak in the middle of the distances an
+   arena produces has the smallest worst deviation. The baseline is the most
+   forgiving of all, which is right for the weapon every bot starts with.
+
+And `dpsProfile` now follows: marksman reads `{ close 17.9, mid 33.9, long 55.3 }`
+where the simulation used to pay out the reverse.
+
+### 7.33.4 What the budget charges now
+
+`fixedCost` prices the two numbers that describe the curve:
+
+- `optimalRange * budget.optimalRangeWeight` — far ground is safer ground.
+- `rangeTolerance * budget.rangeToleranceWeight` — a wide sweet spot is good in
+  every fight with no downside at all, so it costs more per cell than the optimal
+  range does. **This is a new charge.** Nothing used to pay for versatility.
+
+`rangeValueCapCells` and `rangeValueTailShare` are **deleted**. They existed to
+stop the budget paying for reach past the sight radius, and an optimal range
+bounded by the sight radius has no tail to price. Keeping them would have left
+two more numbers that do nothing, which is the defect this section is about.
+
+Raw DPS rose sharply across every archetype, and that is not a buff. The curve
+makes a weapon miss more outside its band, `bandMean` of the profile fell, and
+the budget solved for more damage to reach the same 100 points. The number to
+compare across this change is `dpsProfile` at the weapon's own best band, not
+damage over the fire interval.
+
+### 7.33.5 A weapon built for half the distance is not half as fussy
+
+Scaling `rangeTolerance` by the attack type's full `rangeFactor` gave a cone an
+optimal range of 1.5 cells and a tolerance of 1.5 cells. At 4 cells — inside the
+close band a cone is supposed to own — it was already 1.7 tolerances off and
+sitting at its accuracy **floor**.
+
+`shape.toleranceReachExponent` fixes it at 0.5, a square root. Only the cone is
+materially affected, because it is the only attack type whose reach factor is far
+from 1 (0.55 × 0.45 = 0.2475, whose square root is 0.497).
+`shape.rangeToleranceMinCells` is the safety net under it.
+
+### 7.33.6 A band a weapon cannot fire in earns nothing, the burn included
+
+A cone is gated at about 8 cells. `bandDistanceOf("mid")` is 11.5. So its mid and
+long DPS were a fiction, and `bandMean` still charged 59 % of the budget weight
+for them — the dead-reach defect of Section 7.30.7 arriving from the other end.
+
+`bandReach` is 1 or 0 per band and gates **both** terms of the profile. The
+second term matters as much as the first: damage over time and a hazard tile
+arrive through `flatDps`, which is the same in every band, and a burn needs a
+shot that landed. A weapon that cannot fire at a distance cannot set anything
+alight there either. Before this gate, a cone with a burn read
+`{ close 46.3, mid 31.5, long 31.5 }` and was charged for all of it.
+
+### 7.33.7 The mirror test was asserting something the engine cannot promise
+
+The new role ranges made the mirror test fail on bastion, and this time by a
+whole number: slot 1 health **0 against 11.4** at tick 176.
+
+The probe says the engine is not at fault. The position gap at that tick is
+1.55e-13 cells and every comparable hit chance is **bit-identical**. What broke
+is a threshold. The engine holds several — the band boundaries in `rangeBandOf`,
+the `rangeMax` gate in `selectTarget`, `targetSwitchMargin` — and a distance
+sitting within 1e-15 of one puts the two sides on opposite sides of it. One bot
+then fires a tick earlier than its image, and 1e-15 becomes a whole hit.
+
+The two teams' positions diverge at **tick 2**, by 7.1e-15 cells, so there is no
+window in which they are bit-identical. A sweep of 3 styles by 8 seeds over 600
+ticks put the earliest whole-number break at **tick 165**, and 8 of the 24 runs
+never broke at all:
+
+```
+style           s0     s1     s2     s3     s4     s5     s6     s7
+bastion        176    492   none    357   none    165   none    419
+openfield      529    260    189   none   none    288    242    266
+cavern        none    512   none    265    239    452    371   none
+```
+
+So `TICKS` drops from 260 to **120**, inside that margin. This is not a
+weakening: asserting an exact mirror at tick 260 was asserting something the
+engine cannot promise, and it passed by luck. Every asymmetry this test has ever
+caught was systematic and appeared in the first few ticks — a decision phase
+taken from the index in the bot list, a path search that broke a tie against the
+axes of the world, a danger map that did not know whose bots made the danger.
+A 120-tick window catches all three.
+
+Health and armor keep the 1e-9 tolerance of Section 7.32.5, for the separate
+reason given there.
+
+### 7.33.8 `rangePref` is a bias, not a command
+
+One test had to change its claim rather than its setup. "The head of `rangePref`
+sets the band of Reposition" passed only because the baseline weapon's DPS
+profile used to be flat at 12.8 in all three bands, so the tactic was the only
+signal in `wantedBand`. With the profile derived from the curve, a bot that
+prefers the close band and carries a mid-range weapon now fights at mid.
+
+That is correct, and it is the documented contract: `rangePref` is a **bias on
+the weapon in the hands of the bot**. A preference that overrides the weapon you
+are holding is a preference for missing. The test now states both halves — with a
+neutral weapon the tactic decides, and with a strong weapon the weapon decides.
+
+### 7.33.9 What is not measured yet
+
+Nothing in Sections 7.32 or 7.33 has a batch behind it. The questions stack up
+now, and they want one sweep, not four:
+
+1. Does the Overwatch penalty of Section 7.30.5 move? Its weapon now works where
+   the role stands, and cover now protects the ground it holds.
+   **Measured on cavern: no.** 3O went 20.0 % to 17.5 %, and Section 7.34 says
+   why: the weapon is now a true specialist in a fight that is 16 % of the round.
+2. Is `rangeFloorShare` at 0.15 too generous or too harsh? It decides how badly a
+   weapon out of its band is punished, and it is pure guesswork today.
+3. Does the new `rangeToleranceWeight` price versatility correctly? If precision
+   weapons dominate, it is too cheap.
+4. `bandShare` is still the geometric prior of Section 7.30.4, and it now feeds a
+   profile derived from the curve rather than a hand-written table, so its error
+   propagates further than it did.
+
+**TBD**
+
+## 7.34 The cavern sweep: the curve worked, and Overwatch still lost
+
+1200 rounds over 3 cavern arenas, `data/batch-roles.json`, seed 20260928 — the
+same shape as the band sweep of Section 7.30.5, so the two compare directly.
+
+### 7.34.1 The composition table did not move
+
+| overwatch in the team | before the bands | after the bands | after the curve |
+|---|---|---|---|
+| 0 | 65 % | 64.3 % | **65.7 %** |
+| 1 | 50 % | 51.2 % | **50.4 %** |
+| 2 | 34 % | 34.6 % | **34.2 %** |
+| 3 | 24 % | 20.0 % | **17.5 %** |
+
+Three reworks in a row — the bands, the reach cap, the range curve — each of
+which did exactly what it was built to do, and the table is where it started.
+3O is **worse**, at 17.5 % against 20.0 %.
+
+Side bias stayed clean: pooled mirror A 55.4 ± 4.5 (1.2 standard errors from
+even, which is nothing) and 49.8 ± 1.4 over every round.
+
+### 7.34.2 What did move
+
+| measure | before | after |
+|---|---|---|
+| kills at long range | 13.4 % | 16.3 % |
+| mean kill distance | 9.53 cells | 9.89 cells |
+| hits per shot | 1.016 | 1.171 |
+| mean ticks in a round | 2852 | 2624 |
+
+And the archetypes moved a great deal:
+
+| archetype | share of kills before | after | change |
+|---|---|---|---|
+| **splash** | 10.0 % | **19.5 %** | **+9.5** |
+| assault | 15.3 % | 16.8 % | +1.5 |
+| heavy | 12.5 % | 12.4 % | 0.0 |
+| precision | 15.2 % | 15.0 % | −0.2 |
+| baseline | 16.1 % | 13.9 % | −2.2 |
+| denial | 7.2 % | 4.7 % | −2.5 |
+| **marksman** | 20.9 % | **15.0 %** | **−5.9** |
+
+Splash nearly doubled and took the crown from the marksman. Section 7.32.7 gave
+it the one job nothing else can do, and its optimal range sits where the fighting
+is. The marksman lost nearly six points of the kills.
+
+### 7.34.3 The cause: the marksman is built for a fight that rarely happens
+
+The curve read at the distances this arena actually fights at:
+
+| archetype | optimal | at 5.5c | **at 9.9c** | at 11.5c | at 17.5c |
+|---|---|---|---|---|---|
+| baseline | 12.0 | 0.76 | **0.92** | 0.98 | 0.79 |
+| precision | 13.2 | 0.57 | **0.82** | 0.90 | 0.76 |
+| assault | 6.3 | 0.90 | **0.72** | 0.60 | 0.21 |
+| heavy | 7.0 | 0.84 | **0.72** | 0.57 | 0.17 |
+| splash | 7.2 | 0.67 | **0.49** | 0.42 | 0.30 |
+| **marksman** | 18.3 | 0.16 | **0.33** | 0.45 | 0.89 |
+
+9.9 cells is the mean kill distance in cavern. **At that distance the marksman is
+the worst weapon in the game**, and it is the best only at 17.5 cells, where
+16.3 % of the kills happen.
+
+This is not a fault in the curve. The curve did precisely what Section 7.33 built
+it to do: it turned the marksman into a real specialist, bounded at both ends.
+The trouble is what it specialises in. 83.7 % of the kills land inside 15 cells,
+and a specialist for the other 16 % loses.
+
+The peak is not misplaced either. Working back from the band shares and the mean,
+a long-band kill lands around 17.5 to 20 cells, which is where the marksman's
+peak sits. The band is correctly served. It is simply small.
+
+### 7.34.4 The conclusion: the blocker is not the weapon
+
+Three separate weapon-side reworks have now been measured and none moved the
+composition table:
+
+| change | what it fixed | Overwatch, 3O |
+|---|---|---|
+| the bands (7.30) | the long band held 1 % of kills, now 13 % | 24 % → 20 % |
+| the reach cap (7.32.1) | 21 cells of unusable reach, priced and sold | — |
+| the range curve (7.33) | the simulation contradicted the weapon's own profile | 20 % → 17.5 % |
+
+Each one was a real defect and each is now fixed. None of them was the binding
+constraint.
+
+**The binding constraint is Section 7.31.2: a bot has no concept of good ground.**
+Of the seven actions, not one moves a bot to chosen ground. `HoldPosition` scores
+only the cell it already stands on, `Reposition` needs a visible enemy and only
+corrects the band, and every other move goes to a pickup, an enemy or a teammate.
+So an Overwatch bot cannot select a sight line. It cannot create the long-range
+fight its weapon is built for, and the arena will not hand it one: the ground
+offers sight lines past 20 cells (p90 is 20.2 in cavern) and the bots close to
+9.9 before they kill.
+
+Giving a specialist a better weapon does not help when nothing puts it where the
+weapon works. The next change is the one Section 7.31.2 describes — a
+conflict-zone measure on the map, and a `TakePosition` action that scores
+candidate cells rather than the current one — and it should be measured before
+any further weapon tuning. **TBD**
+
+### 7.34.5 Two things to watch, not yet established
+
+- **Splash at 19.5 % of kills may now be too strong.** It is the largest
+  archetype, and it gained from two changes at once: Section 7.32.7 and an
+  optimal range that happens to sit on the modal kill distance. One sweep cannot
+  separate the two.
+- **Overwatch may have found a partner.** Inside the one-overwatch group the mean
+  is unchanged at 50.4 %, but the spread inside it opened up: 2T1O went 54.2 % →
+  **61.7 %** while 1T1O1S went 50.4 % → **42.5 %**. Each difference is about 1.7
+  standard errors on its own, so neither is established, but together they hint
+  that an Overwatch bot works when two Tanks hold the close band in front of it
+  and fails in any other mix. A sweep aimed at that question would settle it.
+
+## 7.35 The conflict zone, and an action that walks to it
+
+Section 7.34.4 said the blocker was not the weapon. Three weapon reworks, each
+fixing a real defect, and the Overwatch composition did not move once. The
+constraint was Section 7.31.2: **no action moves a bot to chosen ground.** This
+builds the measurement and the action together, because either alone changes
+nothing.
+
+### 7.35.1 What the arena now tells a bot
+
+`src/arena/conflict.ts` measures two fields per cell, once, when the arena is
+built:
+
+- **`contested`** — how evenly the two teams reach the cell. It is
+  `1 - |stepsA - stepsB| / conflict.contestedSpanSteps`, floored at 0, from the
+  two breadth-first walks that `pickupEvenness` already used. Both teams
+  arriving together means the ground is fought over. This is the conflict zone.
+- **`coverage`** — how much of that contested ground the cell can see, by the
+  same rule a weapon shoots along, out to `perception.sightRadiusCells`.
+  Normalised so the best cell of the arena reads 1.
+
+`coverage` is the number an Overwatch bot wants. On the three styles the
+conflict zone is 8 % to 12 % of the floor, and the centre of the map scores 0.85
+to 0.92 against 1.00 at the best cell — which is the bastion centre room saying
+what it is.
+
+The field hangs off `ArenaMap.conflict`, and `parseArenaText` fills it too, so a
+hand-drawn test arena behaves like a generated one. It is a walk of the grid with
+no RNG, so the same arena always gives the same field.
+
+### 7.35.2 The float line walk was not mirror-exact, and it was worth 0.059
+
+The first version of `cellSeesCell` sampled the line with floats and took
+`Math.floor`. The conflict field came out **asymmetric**: 90 cells on bastion,
+340 on openfield, 150 on cavern, differing from their own mirror image by as much
+as **0.059**. An arena is symmetric by construction, so a field that is not is a
+side bias with extra steps.
+
+A first probe of 20 000 random cell pairs found no disagreement, which was
+misleading — the geometry that breaks it is specific. Testing one asymmetric cell
+against every other cell found it at once:
+
+```
+from (31,3)->(27,14) = true    mirror (28,26)->(32,15) = false
+from (31,3)->(26,17) = true    mirror (28,26)->(33,12) = false
+```
+
+The cause is exact: a sample sits at `p = from.x + 0.5 + dx * i / steps`. Its
+mirror sits at `W - p`. And `floor(W - p)` equals `W - 1 - floor(p)` **only when
+`p` is not an integer**. For dx = −4 and steps = 24, `p` is an integer at
+i = 3, 9, 15 and 21, and there the mirrored walk reads a different column.
+
+So the walk is now integer arithmetic. The sample at step `i` is the exact
+rational `((2 * from + 1) * steps + 2 * d * i) / (2 * steps)`, every term an
+integer, so mirroring negates the numerator exactly. A sample that lands exactly
+on a cell boundary touches **both** neighbours and the line counts as blocked if
+either is a wall — a rule that is symmetric, because the pair of cells either
+side of a boundary maps to the pair either side of the mirrored boundary.
+
+The field is now exactly symmetric on all three styles, and a test holds it.
+
+### 7.35.3 `TakePosition`
+
+The seventh action, and the first that moves a bot to ground it chose:
+
+```
+groundValue(cell) = coverage(cell) * ai.conflictWeight      what it overlooks
+                  + coverFromVisible(cell) * cover.aiWeight  what shields it
+                  - min(0.4, danger(cell) * 0.05)            what threatens it
+```
+
+`bestGround` scans 24 candidates — eight bearings at three distances out to
+`ai.takePositionRadiusCells` — plus the cell the bot stands on. The bearings are
+rotations of a unit vector rather than angles, for the reason of Section 7.32.8.
+
+Two guards keep it honest:
+
+- **It runs every `ai.takePositionIntervalTicks`, not every tick.** A bot decides
+  every tick and the scan costs 24 candidate cells; the answer is kept on the bot
+  between searches.
+- **A candidate must beat the current cell by `ai.takePositionMargin`.** Without a
+  margin a bot walks for a rounding difference, arrives, finds the cell it left is
+  now better by the same rounding, and walks back.
+
+It answers to `holdPosition`, the same tactic as `HoldPosition`, because the two
+are halves of one idea: that tactic says how much a bot values ground at all. An
+Overwatch bot carries 0.75 of it and a Tank 0.3, so the role that needs a
+sightline goes looking for one and the role that needs a fight does not. The role
+`behavior` weights sharpen it further: Overwatch 1.6, Skirmisher 0.9, Tank 0.6.
+
+Four of the tests fail with `ai.conflictWeight` at zero, which is the check that
+they test the feature and not the scaffolding.
+
+### 7.35.4 What this does not do yet
+
+- **Tank and Skirmisher do not route around the conflict zone.** Section 7.31.2
+  wanted conflict exposure on the **path** to a pickup, so the two roles that
+  cross the map take the safer way. `groundValue` scores a destination, not a
+  route. **TBD**
+- **`contested` is unused by any bot.** Only `coverage` reaches a decision. A bot
+  that wanted to avoid the zone, rather than overlook it, would read the other
+  field. **TBD**
+- **Nothing is measured.** The next sweep is openfield, where the sight lines are
+  longest (p75 is 17.1 cells against 14.3 in cavern) and the long band should pay
+  the most. **Measured in Section 7.36: the long band shrank.** `coverage` counts
+  contested cells seen without caring at what range, so the best ground is in the
+  middle of the fight and `TakePosition` walked Overwatch into it.
+
+## 7.36 The openfield sweep: the zone sent Overwatch the wrong way
+
+1200 rounds over 3 openfield arenas, same config and seed as before.
+
+**A caution about what this compares.** The last openfield sweep ran before both
+the range curve of Section 7.33 and the conflict zone of Section 7.35, so the two
+changes arrive together here and this batch cannot separate them. Cavern measured
+the curve alone (Section 7.34).
+
+### 7.36.1 The numbers
+
+| overwatch in the team | openfield before | openfield after |
+|---|---|---|
+| 0 | 66.4 % | 65.8 % |
+| 1 | 48.1 % | 51.5 % |
+| 2 | 33.9 % | 31.9 % |
+| 3 | 22.7 % | **18.3 %** |
+
+| measure | before | after |
+|---|---|---|
+| kills at long range | 25.5 % | **21.9 %** |
+| mean kill distance | 11.5 cells | **11.0 cells** |
+| mean ticks in a round | 2773 | 2421 |
+| mean kills in a round | 23.8 | 24.4 |
+| hits per shot | 1.07 | 1.15 |
+
+Openfield has the longest sight lines of the three styles, so it was where the
+long band should have paid the most. **The long band shrank.** Rounds got faster,
+closer and bloodier, and 3O fell again.
+
+### 7.36.2 The cause: coverage rewards standing in the fight, not overlooking it
+
+`coverage` counts how many contested cells a cell can see. The cell that sees the
+most contested ground is a cell in the **middle** of it. Measuring the mean
+distance from the best-scoring cells to the contested ground they actually see:
+
+| style | best cell | coverage | contested there | mean distance to the zone it sees |
+|---|---|---|---|---|
+| bastion | (39,10) | 1.00 | 0.33 | **9.8** |
+| openfield | (24,4) | 1.00 | 0.00 | **9.3** |
+| cavern | (29,10) | 1.00 | 0.33 | **8.0** |
+
+The best ground in every arena overlooks the conflict zone from **8 to 10
+cells** — the close and mid bands — and several of those cells sit **inside** the
+zone. So `TakePosition` walked an Overwatch bot into a knife fight and called it
+good ground. Every number in 7.36.1 follows: bots converge on one place, the
+distances shorten, the rounds run faster, and the role built for 18 cells is the
+one that suffers.
+
+Three specific asymmetries were ruled out before looking further, because a side
+bias would have explained the same numbers differently:
+
+- The conflict field is exactly mirror-symmetric on all three styles.
+- `bestGround` is mirror-symmetric: 0 of 386 start cells disagree with their
+  mirror image.
+- The mirror-break sweep is unchanged, earliest break still tick 165.
+
+Team A won 53.2 % ± 1.4 of every round here against 48.5 % ± 1.4 last time, which
+is 2.4 standard errors apart and worth watching, but nothing in the engine
+explains it and the three checks above came back clean.
+
+### 7.36.3 The fix: coverage has to know the range it is measured at
+
+The measure asks "how much of the fight can this cell see". It should ask **"how
+much of the fight can this cell see at a distance my weapon is good at"**.
+
+The curve of Section 7.33 already answers that. Weight each visible contested
+cell by `rangeAccuracy(weapon, distance)` instead of counting it flat, and the
+same ground scores differently for different roles: an Overwatch bot prefers a
+cell that overlooks the zone from 18 cells, a Tank one that overlooks it from 6.
+
+That cannot stay a single number per cell, because it now depends on who is
+asking. The cheap form is **three fields instead of one** — coverage at close, at
+mid and at long, each computed once when the arena is built — and a bot reads the
+one its weapon is built for, or blends the three by its own band profile. The
+cost of building an arena roughly triples and nothing in a round gets slower.
+
+This also gives the Overwatch role a real answer to the question Section 7.34.4
+left open. It had the weapon and it had somewhere to stand; it did not have a
+reason to stand **back**.
+
+Section 7.37 does it.
+
+## 7.37 Coverage, split by the band it is seen at
+
+Section 7.36.3 said the measure had to know the range it was measured at. This
+does that.
+
+### 7.37.1 Three fields, one normaliser
+
+`ConflictField.coverage` is no longer one number a cell. It is three:
+`close`, `mid` and `long`, each holding the share of the conflict zone that cell
+sees **at that band's distance**.
+
+Splitting costs nothing. Every visible pair was already tested once; it now lands
+in one bucket instead of a flat total. The arena build is the same work.
+
+The three share **one** normaliser, the largest total of any cell, so they stay
+comparable and sum to at most 1. Normalising each band to its own maximum would
+have been wrong: an arena with almost no long view of its conflict zone would
+report a perfect `long` somewhere, when the true answer is that a marksman has
+nowhere good to stand there.
+
+### 7.37.2 A bot reads the band its own weapon is good at
+
+```
+overlook = Σ over bands  coverage[band] * rangeAccuracy(weapon, bandDistance(band))
+```
+
+The range curve of Section 7.33 supplies the second factor, so the two systems
+finally meet: the arena says what a cell overlooks and at what range, and the
+weapon says what that range is worth to the bot holding it.
+
+A marksman reads about 0.15 at the close band and 0.89 at the long one. An
+assault weapon reads the same two the other way round. The same arena hands each
+role different ground, and no per-role table says so.
+
+What that does to a real arena:
+
+| style | best **long** cell | long | mid | close | best **total** cell | long | mid | close |
+|---|---|---|---|---|---|---|---|---|
+| bastion | (41,10) | 0.29 | 0.43 | 0.20 | (40,10) | 0.24 | 0.42 | 0.34 |
+| openfield | (45,7) | **0.52** | 0.01 | 0.00 | (25,6) | 0.09 | 0.38 | **0.53** |
+| cavern | (46,10) | **0.33** | 0.00 | 0.00 | (29,10) | 0.17 | 0.20 | **0.63** |
+
+On openfield the flat count sent every role to (25,6), which watches the fight
+from the close band. A marksman now goes to (45,7) instead, which watches it from
+the long band and sees nothing at all up close. That is the whole change, in one
+row.
+
+Bastion stays mixed, with 0.29 as its best long cell against openfield's 0.52.
+That is the ground being honest: a bastion has short sight lines, so it has less
+sniper ground to offer, and the measure says so instead of inventing some.
+
+### 7.37.3 The tests
+
+Two new tests, and both fail if the bands are collapsed back to a flat count:
+
+- **A marksman and a shotgun choose different ground** from the same cell in the
+  same arena.
+- **The ordering flips.** Given the most close-heavy cell and the most long-heavy
+  cell of an arena, a shotgun values the first above the second and a marksman
+  values them the other way round.
+
+`groundValue` is exported for the second one. It is the function the whole of
+Sections 7.35 to 7.37 exists to get right, so it is worth testing directly rather
+than through the action that calls it.
+
+## 7.38 The band-split sweep: the range came back, the role did not
+
+1200 rounds over 3 openfield arenas, same config and seed. Three runs now compare
+on this ground: before the conflict zone, with the flat coverage of Section 7.35,
+and with the band split of Section 7.37.
+
+### 7.38.1 The mechanism worked
+
+| measure | pre-zone | flat zone | **band zone** |
+|---|---|---|---|
+| kills at long range | 25.5 % | 21.9 % | **26.4 %** |
+| kills at close range | 36.7 % | 36.7 % | **33.6 %** |
+| mean kill distance | 11.53 | 10.98 | **11.59** cells |
+
+The range compression of Section 7.36.2 is not merely undone, it is reversed:
+the long band now holds more of the kills than it did before the conflict zone
+existed, and the fight happens further apart than in either earlier run. The
+band split does exactly what it was built to do.
+
+Side bias came back to even as well: pooled mirror A **50.0 ± 4.6** and
+51.3 ± 1.4 over every round, against 57.1 and 53.2 last time. The 53.2 of
+Section 7.36.2 was noise, as the three symmetry checks there suggested.
+
+### 7.38.2 The composition table moved, half way
+
+| overwatch in the team | pre-zone | flat zone | **band zone** |
+|---|---|---|---|
+| 0 | 66.4 % | 65.8 % | **64.7 %** |
+| 1 | 48.1 % | 51.5 % | **49.7 %** |
+| 2 | 33.9 % | 31.9 % | **36.9 %** |
+| 3 | 22.7 % | 18.3 % | **18.3 %** |
+
+Two overwatch is the best it has ever been: 36.9 %, up 5.0 points on the flat
+zone and 3.0 on the pre-zone baseline. Zero overwatch came down a little. But
+**3O did not move at all**, and the gap is still about 15 points of win rate for
+every Overwatch bot a team fields.
+
+### 7.38.3 The real size of the problem, measured at last
+
+Per-role production tells the story the composition table only hints at:
+
+| run | Tank K/D | Skirmisher K/D | **Overwatch K/D** | Overwatch kills a seat |
+|---|---|---|---|---|
+| pre-zone | 1.08 | 1.14 | 0.75 | 2.62 |
+| flat zone | 1.21 | 1.21 | 0.60 | 2.50 |
+| **band zone** | 1.18 | 1.17 | **0.65** | **2.67** |
+
+An Overwatch bot makes **2.67 kills a seat against 4.97 and 4.69** for the other
+two roles, and it dies more often than it kills. It is about 55 % as productive
+as a Tank, and that is the 15 points a seat, stated as a mechanism.
+
+Sections 7.35 to 7.37 moved it from 2.50 to 2.67 kills a seat and its K/D from
+0.60 to 0.65 — a real gain of about 7 %, against a deficit of 45 %. **The
+positioning was a genuine defect and it was not the main one.**
+
+### 7.38.4 What to measure next, before changing anything
+
+Four candidate causes, and the round record cannot currently separate them:
+
+1. **It shoots less.** `holdPosition` 0.75 and `aggression` 0.4 are both the
+   lowest of the three roles, so an Overwatch bot may spend its ticks holding
+   rather than firing.
+2. **It misses more.** Even with the curve of Section 7.33, a long shot faces the
+   full dodge of a moving target where a close shot does not.
+3. **It is outnumbered where it stands.** A bot alone on a ridge meets two
+   enemies at once, and `focusFireWeight` rewards them for it.
+4. **Its weapon trades rate for damage.** A marksman fires slowly, so a missed
+   shot costs more than a missed assault burst.
+
+One cheap instrument separates the first two from the rest: add `shots_role_*`
+and `hits_role_*` to the round record beside the kills and deaths that are
+already there. Shots a seat answers "does it shoot less", and hits over shots
+answers "does it miss more". Neither needs a new system and both come from events
+the bus already carries.
+
+Measure before tuning. Three weapon reworks and two positioning reworks have each
+fixed a real defect without moving this number, and the reason each time was that
+the defect found was not the binding one. **TBD**
+
 ## 8. Match flow (sequence)
 
 1. Load the arena and the weapon set for the match.

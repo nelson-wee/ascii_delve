@@ -136,14 +136,37 @@ describe("tactics change the weights", () => {
     );
   });
 
-  it("the head of rangePref sets the band of Reposition", () => {
+  it("the head of rangePref sets the band of Reposition, when the weapon is neutral", () => {
+    // `rangePref` is a BIAS on the weapon a bot is holding, not a command
+    // (Section 7.33.8). Give it a weapon with no opinion of its own and the
+    // tactic is the only signal left, so it decides.
     for (const band of ["close", "mid", "long"] as const) {
       const rest = (["close", "mid", "long"] as const).filter((other) => other !== band);
       const state = roomState({ rangePref: [band, rest[0]!, rest[1]!] });
       const [bot] = face(state, 4);
+      bot.weapon = {
+        ...loadBaselineWeapon(),
+        rangeMax: 26,
+        dpsProfile: { close: 20, mid: 20, long: 20 },
+      };
       const action = scoreActions(state, bot).find((c) => c.action.kind === "Reposition")?.action;
       if (action?.kind === "Reposition") expect(action.band).toBe(band);
     }
+  });
+
+  it("lets the weapon overrule the tactic when it has a strong opinion", () => {
+    // The other half of the same contract. A bot that prefers the close band and
+    // carries a marksman weapon fights at long range, because a preference that
+    // beats the weapon in your hands is a preference for missing.
+    const state = roomState({ rangePref: ["close", "mid", "long"] });
+    const [bot] = face(state, 4);
+    bot.weapon = {
+      ...loadBaselineWeapon(),
+      rangeMax: 26,
+      dpsProfile: { close: 4, mid: 18, long: 60 },
+    };
+    const action = scoreActions(state, bot).find((c) => c.action.kind === "Reposition")?.action;
+    if (action?.kind === "Reposition") expect(action.band).toBe("long");
   });
 
   it("gives every band its own distance", () => {
@@ -525,27 +548,43 @@ describe("bestWeaponOverall", () => {
   });
 
   it("weighs a band by how often the arena fires in it", () => {
-    // Section 7.20.15: the AI and the power budget read one number. The long
-    // band is 1 % of shots, so a weapon that only shines there is not the pick.
+    // Section 7.20.15: the AI and the power budget read one number, and
+    // Section 7.30 set that number from the ground. The test works out where
+    // the two weapons should change places and checks both sides of it, so it
+    // does not go stale when `bandShare` moves again.
     const state = roomState();
     const bot = state.bots[0] as BotState;
-    const longOnly = {
-      ...bot.weapon,
-      id: "long-only",
-      rangeMax: 100,
-      dpsProfile: { close: 0, mid: 0, long: 300 },
+    const share = state.config.bandShare;
+    const bias = state.config.rangePrefBias;
+
+    // `rangePref` puts mid at the head and long last, so mid is worth
+    // `1 + bias` and long `1 / (1 + bias)` (Section 7.26).
+    const longDps = 300;
+    const even = (longDps * share.long) / (1 + bias) / (share.mid * (1 + bias));
+
+    const pick = (midDps: number): string => {
+      const longOnly = {
+        ...bot.weapon,
+        id: "long-only",
+        rangeMax: 100,
+        dpsProfile: { close: 0, mid: 0, long: longDps },
+      };
+      const midWeapon = {
+        ...bot.weapon,
+        id: "mid",
+        rangeMax: 100,
+        dpsProfile: { close: 0, mid: midDps, long: 0 },
+      };
+      bot.weapons = [longOnly, midWeapon];
+      bot.ammo.set("long-only", 50);
+      bot.ammo.set("mid", 50);
+      bot.tactics = { ...bot.tactics, rangePref: ["mid", "close", "long"] };
+      return bestWeaponOverall(state, bot).id;
     };
-    const midWeapon = {
-      ...bot.weapon,
-      id: "mid",
-      rangeMax: 100,
-      dpsProfile: { close: 0, mid: 30, long: 0 },
-    };
-    bot.weapons = [longOnly, midWeapon];
-    bot.ammo.set("long-only", 50);
-    bot.ammo.set("mid", 50);
-    bot.tactics = { ...bot.tactics, rangePref: ["mid", "close", "long"] };
-    expect(bestWeaponOverall(state, bot).id).toBe("mid");
+
+    expect(even).toBeGreaterThan(0);
+    expect(pick(even * 1.2)).toBe("mid");
+    expect(pick(even * 0.8)).toBe("long-only");
   });
 
   it("never takes an empty weapon", () => {

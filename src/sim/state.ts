@@ -107,6 +107,13 @@ export interface BotState {
   tactics: Tactics;
   /** The role of the bot (Section 7.11). It sets the preset and the behaviors. */
   role: Role;
+  /**
+   * The ground the bot last chose to hold, and the tick it chose it
+   * (Section 7.35). The search costs about 25 candidate cells, so it runs every
+   * `takePositionIntervalTicks` and the answer is kept between times.
+   */
+  positionGoal: Cell | null;
+  positionGoalTick: number;
   /** The behavior weights of the role, by action kind. */
   roleBehavior: Readonly<Record<string, number>>;
   /** Sub-cell position. The centre of cell (x, y) is (x + 0.5, y + 0.5). */
@@ -259,6 +266,11 @@ export interface SimConfig {
   flankWeight: number;
   /** What each step around the target costs it. */
   flankTurnCost: number;
+  /** How much a bot values ground that overlooks the conflict zone (7.35). */
+  conflictWeight: number;
+  takePositionIntervalTicks: number;
+  takePositionMargin: number;
+  takePositionRadiusCells: number;
   aggressionReactionDiscount: number;
   aggressionRepositionDiscount: number;
   influenceIntervalTicks: number;
@@ -427,6 +439,10 @@ export function simConfigFromTuning(tuning: Tuning = loadTuning()): SimConfig {
     pickupTieShare: tuning.ai.pickupTieShare,
     flankWeight: tuning.ai.flankWeight,
     flankTurnCost: tuning.ai.flankTurnCost,
+    conflictWeight: tuning.ai.conflictWeight,
+    takePositionIntervalTicks: tuning.ai.takePositionIntervalTicks,
+    takePositionMargin: tuning.ai.takePositionMargin,
+    takePositionRadiusCells: tuning.ai.takePositionRadiusCells,
     cover: {
       depthCells: tuning.cover.depthCells,
       stepFalloff: tuning.cover.stepFalloff,
@@ -726,6 +742,8 @@ function makeBot(options: MakeBotOptions): BotState {
     path: [],
     pathGoal: null,
     goalSlotId: null,
+    positionGoal: null,
+    positionGoalTick: -Infinity,
     blockedTicks: 0,
     movedLastTick: false,
     stationaryTicks: 0,

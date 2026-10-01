@@ -114,6 +114,87 @@ describe("coverAgainst: cover is what lies between", () => {
   });
 });
 
+describe("cover shields what is BETWEEN the two bots (Section 7.45.1)", () => {
+  const map = hall([{ x: 27, y: ROW }]);
+  const { cover } = loadTuning();
+
+  it("never lets a shooter's own tile shield its target", () => {
+    // The defect: the walk from the target reached the shooter's cell at two
+    // cells' range and passed it at one, so a bot standing ON cover gave its
+    // target a full screen at point-blank and took none itself. The tile
+    // protected the wrong bot.
+    const shooter = { x: 27, y: ROW }; // standing on the cover tile
+    for (const gap of [1, 2, 3, 4, 6]) {
+      const target = { x: 27 + gap, y: ROW };
+      expect(coverAgainst(map, cover, target, shooter), `gap ${gap}`).toBe(0);
+    }
+  });
+
+  it("gives the shooter nothing from the tile it stands on either", () => {
+    const shooter = { x: 27, y: ROW };
+    for (const gap of [1, 2, 3, 4, 6]) {
+      expect(coverAgainst(map, cover, shooter, { x: 27 + gap, y: ROW }), `gap ${gap}`).toBe(0);
+    }
+  });
+
+  it("gives the tile to the bot that is using it, and not to its enemy", () => {
+    // Cover is NOT reciprocal in general. It reaches `depthCells` from the bot
+    // it shields, so a tile beside one bot and far from the other belongs to the
+    // near one. A bot firing from behind a wall does not hand that wall to the
+    // bot it is firing at.
+    for (const [near, far] of [
+      [26, 32], // the tile is 1 cell from `near`, 5 from `far`
+      [26, 37],
+      [25, 35], // 2 cells from `near`
+      [28, 22], // and it works from the other side of the tile too
+    ] as const) {
+      const a = { x: near, y: ROW };
+      const b = { x: far, y: ROW };
+      expect(coverAgainst(map, cover, a, b), `near ${near}`).toBeGreaterThan(0);
+      expect(coverAgainst(map, cover, b, a), `far ${far}`).toBe(0);
+    }
+  });
+
+  it("is reciprocal only when the tile is in reach of both, which is a special case", () => {
+    // Equidistant, so the two readings agree. This is a consequence of the
+    // geometry being symmetric, not a law about cover.
+    for (const [ax, bx] of [
+      [26, 28],
+      [25, 29],
+      [24, 31],
+    ] as const) {
+      const a = { x: ax, y: ROW };
+      const b = { x: bx, y: ROW };
+      expect(coverAgainst(map, cover, a, b), `${ax} vs ${bx}`).toBeCloseTo(
+        coverAgainst(map, cover, b, a),
+        10,
+      );
+    }
+    // And the one in the middle of that list is reciprocal at a real value, not
+    // reciprocal at zero, which would prove nothing.
+    expect(coverAgainst(map, cover, { x: 25, y: ROW }, { x: 29, y: ROW })).toBeGreaterThan(0);
+  });
+
+  it("reads the same for a pair however the two are named", () => {
+    // What IS a law: the shield of a given bot against a given shooter does not
+    // depend on which of the two the caller asks about first.
+    const a = { x: 26, y: ROW };
+    const b = { x: 32, y: ROW };
+    expect(coverAgainst(map, cover, a, b)).toBe(coverAgainst(map, cover, a, b));
+    expect(coverAgainst(map, cover, b, a)).toBe(coverAgainst(map, cover, b, a));
+  });
+
+  it("gives adjacent bots no cover at all, because nothing is between them", () => {
+    const stacked = hall([{ x: 27, y: ROW }, { x: 28, y: ROW }]);
+    expect(coverAgainst(stacked, cover, { x: 27, y: ROW }, { x: 28, y: ROW })).toBe(0);
+  });
+
+  it("still shields a bot from a tile that really is in the way", () => {
+    // The fix must not empty the mechanic out.
+    expect(coverAgainst(map, cover, { x: 28, y: ROW }, { x: 21, y: ROW })).toBeCloseTo(1, 5);
+  });
+});
+
 describe("coverSaveAt: cover is worth more the further away the shooter is", () => {
   const state = hallState([{ x: 27, y: ROW }]);
   const at: Cell = { x: 28, y: ROW };

@@ -4925,6 +4925,250 @@ So there are two jobs left and they are separable:
 
 **TBD**
 
+## 7.44 Support: joining a fight a teammate is already in
+
+Observed in live play: bots walk between pickup points while an engagement is
+happening somewhere else. The action set had nothing for it. Of the eight actions,
+`Engage` and `Chase` both need a target of the bot's own, and `Follow` keys on the
+**distance** to the nearest teammate rather than on whether that teammate is
+fighting — and it answers to `1 - holdPosition`, so the role that holds ground
+followed the least.
+
+### 7.44.1 The action
+
+`Support` is offered only when the bot has no visible enemy **and** a living
+teammate does. It picks the teammate in the hardest fight, by two things a bot can
+read about a teammate without any shared knowledge of the enemy:
+
+```
+urgency = min(1, enemies it sees / teamSize) * (1 - supportHurtShare)
+        + (health it has lost)              * supportHurtShare
+value   = actionBase.support * urgency * nearness(bot -> teammate)
+weight  = 0.5 + aggression
+```
+
+`aggression` is the tactic, not `holdPosition`: this is the action that means "go
+where the fighting is". A tie between two teammates goes to the lower slot, which
+is the same slot for both teams, so the choice stays a mirror image.
+
+**It stops short rather than piling in.** `approachCell` walks the line toward the
+teammate and halts at the bot's own preferred engagement distance, from
+`bandDistance(wantedBand(bot))`. And it is not offered at all when the bot is
+already inside that distance, because then there is no ground to cover and
+`HoldPosition` and `TakePosition` should decide.
+
+That distance follows **the weapon in hand**, not the role, which is the rule of
+Section 7.33.8 and worth stating because it is easy to assume otherwise:
+
+| weapon held | approach halts |
+|---|---|
+| assault, denial | 4.0 cells short |
+| baseline, precision | 11.5 cells short |
+| marksman | 18.8 cells short |
+
+The role enters through the score, not the distance. The request asked that a bot
+weighted toward covering a zone not displace to a distant fight, and it does not:
+at 37 cells from a teammate facing two enemies at 40 health, Support scores
+
+| role | score | what the bot does instead |
+|---|---|---|
+| tank | 0.296 | **Support wins** |
+| skirmisher | 0.281 | Follow, 0.50 |
+| overwatch | 0.094 | TakePosition, 1.23 |
+
+`behavior.support` is 1.2 for Tank, 1.35 for Skirmisher and 0.55 for Overwatch.
+
+### 7.44.2 What the measurement said about the observation
+
+The action mix, over 3 rounds a style, as a share of living bot-ticks:
+
+| style | Engage | SeekPickup | Support | TakePosition | Follow |
+|---|---|---|---|---|---|
+| bastion | 22.9 % | **55.7 %** | 3.2 % | 6.5 % | 6.2 % |
+| cavern | 20.5 % | **63.4 %** | 2.5 % | 6.2 % | 4.1 % |
+| openfield | 23.5 % | **48.7 %** | 3.0 % | 8.0 % | 8.5 % |
+
+**A bot spends half to two thirds of every round walking to a pickup point, and a
+fifth of it fighting.** That is the observation, quantified.
+
+Two things this rules out. It is **not** a consequence of Section 7.41: at the old
+`weaponGainMax` of 1.6 the same measurement read 58.9 %, 64.9 % and 48.3 %, so
+pickup-chasing predates that change and was not caused by it. And `Support` alone
+does **not** fix it: at first it reached 1.6 % to 2.3 % of ticks and what it
+displaced was `Follow` and `HoldPosition`, not `SeekPickup`, because it has to
+outbid a weapon point that Section 7.41 now values up to 4.0.
+
+### 7.44.3 So a fight suppresses a far pickup run
+
+`SeekPickup` already carries a suppression term for `holdPosition`: a run across
+the arena is discouraged, an item at the bot's feet is not. A fight now enters the
+same term:
+
+```
+suppression *= 1 - fightSuppressesPickup * urgency * (1 - nearness(pickup))
+```
+
+**It never applies to a bot still holding only the starting rifle.** An unarmed
+bot joining a fight is a gift to the other team, and arming itself is the whole
+finding of Section 7.40. The `isArmed` gate means this change cannot undo that
+one, and a test holds it.
+
+With the suppression in, Support runs at 2.5 % to 3.2 % of ticks and `SeekPickup`
+falls by one to four points. That is a real change and a modest one. Both numbers
+are data — `actionBase.support`, the three `behavior.support` weights, and
+`fightSuppressesPickup` — so the size of the effect is a dial, not a rewrite.
+
+### 7.44.4 The regression sweep
+
+1200 rounds on 3 openfield arenas, against the same style in Section 7.42.
+
+| Overwatch in the team | before Support | after |
+|---|---|---|
+| 0 | 56.4 % | 56.1 % |
+| 1 | 49.3 % | 48.9 % |
+| 2 | 44.0 % | 42.5 % |
+| 3 | **38.8 %** | **43.8 %** |
+
+Nothing regressed, and 3O rose 5.0 points. That is about 1.1 standard errors on
+its own, so it is **suggestive and not established** — but it sits beside three
+other things that agree with it. The spread from best composition to worst
+narrowed again, 17.6 points to 13.6. The cost of an Overwatch seat fell from 5.9
+points to 4.1. And 3O at 43.8 now reads slightly **above** two Overwatch at 42.5,
+which breaks the monotonic "more Overwatch is worse" order for the first time in
+the whole search, though the two overlap inside their error.
+
+Side bias held: 51.0 ± 1.4 over every round, pooled mirror A 44.6 ± 4.5.
+
+**The gain is coordination, not production.** Per-role numbers barely moved —
+Overwatch K/D 0.946 to 0.944, damage a seat 440 to 443, kills a seat 3.37 to
+3.42 — and the round is the same shape, 2654 ticks to 2676 and 25.0 kills to
+24.7 with the band shares unchanged. Three Overwatch bots that converge on a
+fight win more rounds without any of them killing more, which is what a
+reinforcement action should do and is the one thing none of the earlier reworks
+could have produced.
+
+### 7.44.5 What is not settled
+
+- **Whether 50 % to 63 % on pickups is wrong at all.** An arena shooter is partly
+  a game of item control, and 20 % of ticks in contact against 25 kills a round is
+  about 6 seconds of engagement per kill, which is not obviously broken. The
+  measurement says what the bots do; it does not say what they should do. Raising
+  `fightSuppressesPickup` further is easy and its cost would be the balance of
+  Section 7.43, which took five reworks to reach.
+- **`Reposition` reads 0.0 % on every style.** It is offered only with a visible
+  enemy and a band mismatch, and `Engage` appears to cover that case already. A
+  branch that never fires is the defect this guide keeps finding, and it wants its
+  own look. **TBD**
+
+## 7.45 Is cover working? Four questions and one real bug
+
+### 7.45.1 A shooter's own tile shielded its target
+
+`coverAgainst` walks from the target toward the shooter and reads the first
+`cover.depthCells` cells. It excluded the **target's** own tile, on the rule that
+a cover tile you stand on is a shooting position and not a screen. It did not
+exclude the **shooter's**.
+
+At two cells' range the walk reached the shooter's cell. At one cell it passed it.
+So a bot standing on cover, firing at a bot in the open:
+
+| gap | the target's shield, from the shooter's own cover |
+|---|---|
+| 1 cell | **1.000** |
+| 2 cells | **0.500** |
+| 3 cells and out | 0 |
+
+And the reverse read 0 at every gap, correctly. **The tile protected the wrong
+bot.** Standing on cover at point-blank range was strictly bad: it gave the enemy
+a full screen and the bot holding it nothing.
+
+The walk now stops one cell short of the shooter, and two bots with nothing
+between them get no cover at all:
+
+```
+if (distance < 2) return 0;
+const depth = Math.min(cover.depthCells, distance - 1);
+```
+
+Five tests hold it, and two of them fail against the old walk.
+
+### 7.45.2 Cover is not symmetric, and my first test proved a tautology
+
+I wrote at first that cover is a fact about the ground, so it reads the same to
+both bots. That is wrong, and the user caught it. `coverAgainst(a, b)` walks the
+line from `a` toward `b` and reads only the first `cover.depthCells` cells of it.
+The tile must be **near the bot it shields**. A tile two cells in front of A, and
+eight cells in front of B, is A's screen alone.
+
+My test read equal numbers from both ends because every pair in it sat
+**equidistant** from the tile. With that one geometry the walk cannot do anything
+else, so the test held whatever the code did.
+
+A cover tile at x=20 on one row, with `depthCells` at 2, reads:
+
+| A | B | tile to A | tile to B | A's shield | B's shield | who holds it |
+|---|---|---|---|---|---|---|
+| 19 | 25 | 1 | 5 | **1.000** | 0.000 | A alone |
+| 18 | 28 | 2 | 8 | **0.500** | 0.000 | A alone |
+| 19 | 21 | 1 | 1 | 1.000 | 1.000 | both |
+| 25 | 15 | 5 | 5 | 0.000 | 0.000 | neither |
+
+So a bot behind a tile holds it against a bot in the open, and hands that bot
+nothing. Both bots read the same number only where the tile is within
+`depthCells` of both of them, which needs them almost shoulder to shoulder, or
+where it is out of reach of both and the number is zero. That is the special
+case, not the rule, and it is what makes a flank pay.
+
+What *is* symmetric is the naming: `coverAgainst(a, b)` does not care which bot
+was called the shooter when the two stand the same distance out. Three tests now
+hold all of this, in place of the one that proved nothing:
+
+- `gives the tile to the bot that is using it, and not to its enemy`
+- `is reciprocal only when the tile is in reach of both, which is a special case`
+- `reads the same for a pair however the two are named`
+
+### 7.45.3 Bots do use cover
+
+`tools/measure-cover-use.ts` asks a real round rather than the arithmetic. While a
+bot is in contact, how much cover does it hold against the enemy it sees, against
+how much the cells around it were offering?
+
+| style | cover held | on offer nearby | difference |
+|---|---|---|---|
+| bastion | 0.1045 | 0.0797 | **+31 %** |
+| cavern | 0.0959 | 0.0681 | **+41 %** |
+| openfield | 0.0605 | 0.0486 | **+24 %** |
+
+A bot in a fight holds a quarter to two fifths more cover than the ground around
+it offers on average. `cover.aiWeight` at 0.35 is doing real work.
+
+### 7.45.4 Flanking works where there is somewhere to flank to
+
+When a bot dies, how much cover did it have from the bearing it was shot from,
+against its mean over every bearing an attacker could really have fired from?
+Lower means the attacker came round the cover.
+
+| style | cover at the kill | mean over shootable bearings | reading |
+|---|---|---|---|
+| openfield | 0.0264 | 0.0503 | **−47 %, flanked** |
+| bastion | 0.0556 | 0.0581 | −4 %, neutral |
+| cavern | 0.0545 | 0.0396 | **+38 %, the reverse** |
+
+So flanking shows clearly on open ground and not on the two walled styles.
+
+**The bearing filter is what makes this measurable at all.** A first attempt
+counted all sixteen bearings, including those facing a wall, which score no cover
+and drag the mean down — and it invented a flanking result on exactly the styles
+with the most walls. Restricted to bearings that are walkable with a clear line,
+a victim exposes only **3.9 to 5.3 of 16**.
+
+That is the likely reason, and it is only part of one: openfield offers the most
+shootable bearings and flanks best, which fits, but cavern offers more than
+bastion and flanks worse, which does not. `FLANK_TURNS` offers seven bearings and
+skips any that is unwalkable or has no clear shot, so in a walled arena the search
+is starved — but starvation does not explain a **reversal**. Cavern wants its own
+look. **TBD**
+
 ## 8. Match flow (sequence)
 
 1. Load the arena and the weapon set for the match.

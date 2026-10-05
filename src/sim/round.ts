@@ -95,7 +95,7 @@ function startSuddenDeath(state: SimState): void {
  * Decision: a drawn round goes to sudden death, and the next kill wins.
  */
 export function enterSuddenDeathIfNeeded(state: SimState): void {
-  if (state.suddenDeath) return;
+  if (state.suddenDeath || state.config.endRule === "clear") return;
   if (state.tick < state.config.timeLimitTicks) return;
   if (leader(state) !== null) return;
   startSuddenDeath(state);
@@ -104,6 +104,7 @@ export function enterSuddenDeathIfNeeded(state: SimState): void {
 /** The result of the round, or `null` while the round runs. */
 export function checkRoundEnd(state: SimState): RoundOutcome | null {
   const { config, score, tick } = state;
+  if (config.endRule === "clear") return checkLevelEnd(state);
 
   // Both teams can cross the limit on the same tick: one bot of each team dies
   // in the same exchange, or one shot of area damage kills two. This walked
@@ -146,6 +147,40 @@ export function checkRoundEnd(state: SimState): RoundOutcome | null {
   return null;
 }
 
+/**
+ * The end of a delve level.
+ *
+ * Team A is the party and team B is the mobs. Nobody respawns, so the level
+ * ends when one side has nobody left. The time limit is a safety limit only: a
+ * level that reaches it has no winner.
+ */
+function checkLevelEnd(state: SimState): RoundOutcome | null {
+  const { score, tick } = state;
+  const alive = (teamId: TeamId): boolean =>
+    state.bots.some((bot) => bot.alive && bot.teamId === teamId);
+  if (!alive("A")) return { winnerTeamId: "B", reason: "wiped", score: { ...score }, ticks: tick };
+  if (!alive("B")) return { winnerTeamId: "A", reason: "cleared", score: { ...score }, ticks: tick };
+  if (tick >= state.config.timeLimitTicks) {
+    return { winnerTeamId: null, reason: "timeLimit", score: { ...score }, ticks: tick };
+  }
+  return null;
+}
+
+/**
+ * Add what the bots of an exploring team see to the memory of the team.
+ * Only a delve party explores, so a tournament round skips this.
+ */
+function updateExplored(state: SimState): void {
+  for (const teamId of TEAM_IDS) {
+    const explored = state.explored[teamId];
+    if (!explored) continue;
+    for (const bot of state.bots) {
+      if (!bot.alive || bot.teamId !== teamId) continue;
+      bot.visibleCells.forEach((index) => explored.add(index));
+    }
+  }
+}
+
 /** Run one tick of the simulation. A tick after the round end does nothing. */
 export function step(state: SimState): void {
   if (state.outcome !== null) return;
@@ -156,7 +191,7 @@ export function step(state: SimState): void {
   // 1. Timers.
   for (const bot of order) {
     if (bot.fireCooldownTicks > 0) bot.fireCooldownTicks -= 1;
-    if (!bot.alive && state.tick >= bot.respawnAtTick) respawn(state, bot);
+    if (!bot.alive && state.config.respawn && state.tick >= bot.respawnAtTick) respawn(state, bot);
   }
   applyDots(state);
   applyHazards(state);
@@ -165,6 +200,7 @@ export function step(state: SimState): void {
 
   // 2. Perception, then the influence maps of Section 7.9.
   updatePerception(state);
+  updateExplored(state);
   updateInfluence(state);
 
   // 3 and 4. AI decision and intent.

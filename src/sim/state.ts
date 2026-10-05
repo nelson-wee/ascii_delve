@@ -28,7 +28,7 @@ import {
 } from "./pickups.js";
 import type { Cell, Vec2 } from "../core/types.js";
 import type { CoverConfig } from "./cover.js";
-import type { RangeBand, Weapon } from "../weapons/types.js";
+import { POWERUP_TIER, type RangeBand, type Weapon } from "../weapons/types.js";
 
 /** Team ids of Milestone M3. Generated team names arrive with M11. */
 export const TEAM_IDS = ["A", "B"] as const;
@@ -102,6 +102,18 @@ export interface HazardCell {
 export interface BotState {
   id: string;
   teamId: TeamId;
+  /** The name that the display shows: a class, a kind of mob, or the role. */
+  label: string;
+  /** The full health of this bot. A delve gives each class and mob its own. */
+  healthMax: number;
+  /** False for a bot that walks over a pickup point and leaves it (a mob). */
+  takesPickups: boolean;
+  /**
+   * The unexplored cell that the bot walks to, and the tick it chose it. Only
+   * a team that explores (a delve party) uses it.
+   */
+  exploreGoal: Cell | null;
+  exploreGoalTick: number;
   attributes: Attributes;
   /** What the player TELLS the bot (Section 6.4). */
   tactics: Tactics;
@@ -240,6 +252,14 @@ export interface SimConfig {
   turnRatePerTick: number;
   healthMax: number;
   respawnDelayTicks: number;
+  /** False in a delve: a bot that dies stays dead. */
+  respawn: boolean;
+  /**
+   * How a round ends. `score`: the score limit, the time limit and sudden death
+   * of the tournament. `clear`: team A clears the level when team B is all
+   * dead, and is wiped when team A is all dead.
+   */
+  endRule: "score" | "clear";
   rangeBandCloseMax: number;
   rangeBandMidMax: number;
   /** The least a weapon keeps from range alone (Section 7.33). */
@@ -312,7 +332,7 @@ export interface SimConfig {
 }
 
 /** Why a round ended. */
-export type RoundEndReason = "scoreLimit" | "timeLimit" | "suddenDeath";
+export type RoundEndReason = "scoreLimit" | "timeLimit" | "suddenDeath" | "cleared" | "wiped";
 
 export interface RoundOutcome {
   /** `null` means a draw: the time ran out with an equal score. */
@@ -362,6 +382,11 @@ export interface SimState {
   runWeapons: readonly Weapon[];
   /** The influence maps of Section 7.9. */
   influence: InfluenceMaps;
+  /**
+   * The cells that a team has seen this round, for each team that explores.
+   * A delve party reads it to find the ground it has not searched yet.
+   */
+  explored: Partial<Record<TeamId, CellSet>>;
   /** Where bots died lately. The danger map reads it. */
   recentDeaths: { cell: Cell; tick: number; teamId: TeamId }[];
   rng: Rng;
@@ -403,6 +428,44 @@ export interface CreateSimStateOptions {
   roles?: Partial<Record<TeamId, readonly Role[]>>;
   /** The team tactics of Section 6.5. */
   teamTactics?: Partial<Record<TeamId, TeamTactics>>;
+  /**
+   * The bots of a team, one spec each. A team with a roster ignores `roles`
+   * and the spawn cells of the arena, and it can hold any number of bots. A
+   * delve gives the party and the mobs this way.
+   */
+  roster?: Partial<Record<TeamId, readonly BotSpec[]>>;
+  /** The teams that keep a memory of the cells they have seen. */
+  explore?: readonly TeamId[];
+}
+
+/** What a bot carries into a round from the round before it. */
+export interface BotCarry {
+  alive: boolean;
+  health: number;
+  armor: number;
+  weapons: readonly Weapon[];
+  /** The id of the weapon in the hands of the bot. */
+  weaponId: string;
+  ammo: ReadonlyMap<string, number>;
+}
+
+/** One bot of a roster. */
+export interface BotSpec {
+  id: string;
+  label: string;
+  spawn: Cell;
+  role: Role;
+  /** Replaces part of the role tactics. */
+  tactics?: Partial<Tactics>;
+  /** Replaces part of the role behavior weights. */
+  behavior?: Readonly<Record<string, number>>;
+  healthMax?: number;
+  /** A factor on the move speed of the tuning. */
+  moveSpeedScale?: number;
+  /** The weapons that the bot holds at the start. The first is its fallback. */
+  weapons?: readonly Weapon[];
+  takesPickups?: boolean;
+  carry?: BotCarry;
 }
 
 /** Read the simulation numbers from `data/tuning.json`. */
@@ -424,6 +487,8 @@ export function simConfigFromTuning(tuning: Tuning = loadTuning()): SimConfig {
     turnRatePerTick: (tuning.perception.turnRateDegreesPerTick * Math.PI) / 180,
     healthMax: tuning.combat.healthMax,
     respawnDelayTicks: tuning.combat.respawnDelayTicks,
+    respawn: true,
+    endRule: "score",
     rangeBandCloseMax: tuning.combat.rangeBandCloseMax,
     rangeBandMidMax: tuning.combat.rangeBandMidMax,
     rangeFloorShare: tuning.combat.rangeFloorShare,
@@ -719,6 +784,7 @@ export function teamSpawns(state: SimState, teamId: TeamId): Cell[] {
 
 interface MakeBotOptions {
   id: string;
+  label: string;
   teamId: TeamId;
   spawn: Cell;
   slot: number;
@@ -731,6 +797,9 @@ interface MakeBotOptions {
   cellCount: number;
   facing: number;
   rng: Rng;
+  healthMax: number;
+  moveSpeedPerTick: number;
+  takesPickups: boolean;
 }
 
 function makeBot(options: MakeBotOptions): BotState {
@@ -738,13 +807,18 @@ function makeBot(options: MakeBotOptions): BotState {
   return {
     id: options.id,
     teamId: options.teamId,
+    label: options.label,
+    healthMax: options.healthMax,
+    takesPickups: options.takesPickups,
+    exploreGoal: null,
+    exploreGoalTick: -Infinity,
     attributes: options.attributes,
     tactics: options.tactics,
     role: options.role,
     roleBehavior: options.roleBehavior,
     pos: cellCenter(options.spawn),
     facing: options.facing,
-    moveSpeedPerTick: config.moveSpeedPerTick,
+    moveSpeedPerTick: options.moveSpeedPerTick,
     path: [],
     pathGoal: null,
     goalSlotId: null,
@@ -767,7 +841,7 @@ function makeBot(options: MakeBotOptions): BotState {
     decisionCooldownTicks: options.slot % config.aiDecisionIntervalTicks,
     rng: options.rng,
     alive: true,
-    health: config.healthMax,
+    health: options.healthMax,
     armor: 0,
     shield: 0,
     powerups: new Map<string, number>(),
@@ -823,15 +897,49 @@ export function createSimState(options: CreateSimStateOptions): SimState {
       ? overrideOption
       : (overrideOption[teamId] ?? loadDefaultTactics());
 
+  const roster = options.roster ?? {};
+  const spawnTeams = TEAM_IDS.filter((teamId) => roster[teamId] === undefined);
   const needed = config.teamSize * TEAM_IDS.length;
-  if (map.spawns.length < needed) {
+  if (spawnTeams.length > 0 && map.spawns.length < needed) {
     throw new Error(
       `The arena "${map.name}" has ${map.spawns.length} spawn cells, but ${needed} are needed.`,
     );
   }
 
+  // A bot starts by looking at the middle of the arena.
+  const facingFrom = (spawn: Cell): number =>
+    Math.atan2(map.height / 2 - (spawn.y + 0.5), map.width / 2 - (spawn.x + 0.5));
+
   const bots: BotState[] = [];
   for (const teamId of TEAM_IDS) {
+    const specs = roster[teamId];
+    if (specs !== undefined) {
+      for (const [slot, spec] of specs.entries()) {
+        const roleData = rolesData.roles[spec.role];
+        const bot = makeBot({
+          id: spec.id,
+          label: spec.label,
+          teamId,
+          spawn: spec.spawn,
+          slot,
+          rng: createRng(deriveSeed(seed, `${teamId}:bot:${slot}`), `sim/${teamId}${slot}`),
+          config,
+          attributes: { ...attributes },
+          tactics: { ...(roleData?.tactics ?? loadDefaultTactics()), ...spec.tactics },
+          role: spec.role,
+          roleBehavior: { ...roleData?.behavior, ...spec.behavior },
+          weapons: spec.weapons ?? weapons,
+          cellCount: map.width * map.height,
+          facing: facingFrom(spec.spawn),
+          healthMax: spec.healthMax ?? config.healthMax,
+          moveSpeedPerTick: config.moveSpeedPerTick * (spec.moveSpeedScale ?? 1),
+          takesPickups: spec.takesPickups ?? true,
+        });
+        if (spec.carry) applyCarry(bot, spec.carry);
+        bots.push(bot);
+      }
+      continue;
+    }
     // The teams change ends after every round, so the side comes from the
     // round number and not from the place of the team in the list.
     const side = teamSideIndex(teamId, roundNumber, sideOffset);
@@ -851,6 +959,7 @@ export function createSimState(options: CreateSimStateOptions): SimState {
       bots.push(
         makeBot({
           id: `${teamId}${slot}`,
+          label: role,
           teamId,
           spawn,
           // The slot inside the team, not the index in the bot list: the
@@ -865,8 +974,10 @@ export function createSimState(options: CreateSimStateOptions): SimState {
           roleBehavior: roleData?.behavior ?? {},
           weapons,
           cellCount: map.width * map.height,
-          // A bot starts by looking at the middle of the arena.
-          facing: Math.atan2(map.height / 2 - (spawn.y + 0.5), map.width / 2 - (spawn.x + 0.5)),
+          facing: facingFrom(spawn),
+          healthMax: config.healthMax,
+          moveSpeedPerTick: config.moveSpeedPerTick,
+          takesPickups: true,
         }),
       );
     }
@@ -896,6 +1007,9 @@ export function createSimState(options: CreateSimStateOptions): SimState {
     spawnTable,
     runWeapons: weapons,
     influence: createInfluenceMaps(map),
+    explored: Object.fromEntries(
+      (options.explore ?? []).map((teamId) => [teamId, new CellSet(map.width * map.height)]),
+    ),
     recentDeaths: [],
     rng,
     bus,
@@ -906,7 +1020,43 @@ export function createSimState(options: CreateSimStateOptions): SimState {
   }
 
   for (const bot of state.bots) {
+    if (!bot.alive) continue;
     bus.emit("Spawn", 0, roundNumber, { botId: bot.id, teamId: bot.teamId, cell: botCell(bot) });
   }
   return state;
+}
+
+/**
+ * Put what a bot carried out of the last round into a new bot.
+ *
+ * A dead bot stays dead: it never respawns, so a delve party member that fell
+ * stays down until the party goes back to town.
+ */
+function applyCarry(bot: BotState, carry: BotCarry): void {
+  // A carry with no weapon keeps the fallback the bot was made with: the first
+  // weapon of a bot is the one that never runs dry (Section 7.3).
+  if (carry.weapons.length > 0) bot.weapons = [...carry.weapons];
+  bot.weapon = bot.weapons.find((weapon) => weapon.id === carry.weaponId) ?? bot.weapons[0] ?? bot.weapon;
+  bot.ammo = new Map(carry.ammo);
+  bot.armor = carry.armor;
+  if (carry.alive && carry.health > 0) {
+    bot.health = Math.min(bot.healthMax, carry.health);
+    return;
+  }
+  bot.alive = false;
+  bot.health = 0;
+  bot.respawnAtTick = Infinity;
+}
+
+/** What a bot carries out of a round into the next one. */
+export function carryOf(bot: BotState): BotCarry {
+  return {
+    alive: bot.alive,
+    health: bot.alive ? bot.health : 0,
+    armor: bot.alive ? bot.armor : 0,
+    // A power-up weapon is a power-up. It ends with the round.
+    weapons: bot.weapons.filter((weapon) => weapon.tier !== POWERUP_TIER),
+    weaponId: bot.weapon.id,
+    ammo: new Map(bot.ammo),
+  };
 }

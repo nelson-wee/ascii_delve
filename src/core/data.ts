@@ -12,12 +12,15 @@ import tacticsJson from "../../data/tactics.json";
 import weaponRolesJson from "../../data/weapon-roles.json";
 import tuningJson from "../../data/tuning.json";
 import arenaProfilesJson from "../../data/arena-profiles.json";
+import delveJson from "../../data/delve.json";
 import baselineWeaponJson from "../../data/weapons/baseline.json";
 import redeemerWeaponJson from "../../data/weapons/redeemer.json";
 import type { Weapon } from "../weapons/types.js";
 import {
   AnnouncementsSchema,
   ArenaProfilesSchema,
+  DelveSchema,
+  type Delve,
   type ArenaProfiles,
   TacticsFileSchema,
   TuningSchema,
@@ -68,6 +71,7 @@ let tacticsCache: Tactics | null = null;
 let weaponRolesCache: WeaponRoles | null = null;
 let pickupsCache: Pickups | null = null;
 let rolesCache: Roles | null = null;
+let delveCache: Delve | null = null;
 
 /** The global tuning numbers. The result is cached after the first call. */
 export function loadTuning(): Tuning {
@@ -142,6 +146,12 @@ export function loadRoles(): Roles {
   return rolesCache;
 }
 
+/** The party classes, the mobs, and the levels of a delve. */
+export function loadDelve(): Delve {
+  delveCache ??= parseData("data/delve.json", DelveSchema, delveJson);
+  return delveCache;
+}
+
 /** Forget the cached data files. The tests use this. */
 export function clearDataCache(): void {
   tuningCache = null;
@@ -153,4 +163,5 @@ export function clearDataCache(): void {
   weaponRolesCache = null;
   pickupsCache = null;
   rolesCache = null;
+  delveCache = null;
 }

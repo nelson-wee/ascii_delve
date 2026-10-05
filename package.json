@@ -1,9 +1,9 @@
 {
-  "name": "ascii-bot-shooter",
+  "name": "ascii-delve",
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "ASCII Bot Shooter \u2014 an indirect-control ASCII team shooter tournament.",
+  "description": "ASCII Delve: a party of three AI agents clears procedurally generated dungeon levels. Forked from ascii_tournament.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -14,7 +14,8 @@
     "lint": "eslint .",
     "batch": "tsx src/cli/batch.ts",
     "arena": "tsx src/cli/arena.ts",
-    "styles": "tsx src/cli/styles.ts"
+    "styles": "tsx src/cli/styles.ts",
+    "delve": "tsx src/cli/delve.ts"
   },
   "dependencies": {
     "rot-js": "^2.2.1",

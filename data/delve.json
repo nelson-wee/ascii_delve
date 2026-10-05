@@ -1,0 +1,122 @@
+{
+  "_notes": "A delve (docs/delve.md). The party is team A and the mobs are team B. A class and a mob kind each name a role of data/roles.json, which gives them their tactics and their behavior weights; `mobBehavior` and `mobTactics` then turn a role into a mob that waits in its room, takes no items, and fights as a pack. A mob weapon is the baseline weapon with the fields below put over it. Every number is a placeholder. TBD",
+  "timeLimitTicks": 6000,
+  "styles": [
+    "bastion",
+    "cavern",
+    "openfield"
+  ],
+  "weaponsPerRun": 5,
+  "classes": {
+    "fighter": {
+      "name": "Fighter",
+      "role": "tank",
+      "healthMax": 150,
+      "moveSpeedScale": 1
+    },
+    "thief": {
+      "name": "Thief",
+      "role": "skirmisher",
+      "healthMax": 100,
+      "moveSpeedScale": 1.15
+    },
+    "wizard": {
+      "name": "Wizard",
+      "role": "overwatch",
+      "healthMax": 80,
+      "moveSpeedScale": 1
+    }
+  },
+  "party": [
+    "fighter",
+    "thief",
+    "wizard"
+  ],
+  "partyBehavior": {
+    "holdPosition": 0.5,
+    "takePosition": 0.5,
+    "chase": 1.3,
+    "explore": 1.2
+  },
+  "mobs": {
+    "grunt": {
+      "name": "Grunt",
+      "role": "tank",
+      "healthMax": 80,
+      "moveSpeedScale": 0.85,
+      "weapon": {
+        "name": "Claws",
+        "attackType": "hitscan",
+        "damage": 9,
+        "fireIntervalTicks": 14,
+        "rangeMax": 2.5,
+        "optimalRange": 1.5,
+        "rangeTolerance": 3
+      }
+    },
+    "archer": {
+      "name": "Archer",
+      "role": "overwatch",
+      "healthMax": 55,
+      "moveSpeedScale": 0.9,
+      "weapon": {
+        "name": "Shortbow",
+        "attackType": "projectile",
+        "damage": 8,
+        "fireIntervalTicks": 20,
+        "rangeMax": 18,
+        "optimalRange": 9,
+        "rangeTolerance": 9,
+        "projectileSpeed": 0.9
+      }
+    },
+    "brute": {
+      "name": "Brute",
+      "role": "tank",
+      "healthMax": 170,
+      "moveSpeedScale": 0.7,
+      "weapon": {
+        "name": "Cleaver",
+        "attackType": "cone",
+        "damage": 18,
+        "fireIntervalTicks": 24,
+        "rangeMax": 3,
+        "optimalRange": 2,
+        "rangeTolerance": 3,
+        "coneHalfAngleDegrees": 40
+      }
+    }
+  },
+  "mobBehavior": {
+    "seekPickup": 0,
+    "takePosition": 0,
+    "explore": 0,
+    "reposition": 0.6,
+    "follow": 0.2,
+    "holdPosition": 0.25,
+    "chase": 2.0,
+    "support": 1.3
+  },
+  "mobTactics": {
+    "itemControl": 0,
+    "holdPosition": 0.6,
+    "hazardTolerance": 0.2,
+    "aggression": 0.8
+  },
+  "levels": {
+    "packsBase": 2,
+    "packsPerDepth": 0.5,
+    "packsMax": 7,
+    "packSizeMin": 2,
+    "packSizeMax": 3,
+    "mobHealthPerDepth": 0.15,
+    "mobDamagePerDepth": 0.1,
+    "minDistanceShare": 0.35,
+    "packSpacingSteps": 8,
+    "kindWeights": {
+      "grunt": 4,
+      "archer": 3,
+      "brute": 1
+    }
+  }
+}

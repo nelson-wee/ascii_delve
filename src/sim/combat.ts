@@ -384,7 +384,7 @@ export function respawn(state: SimState, bot: BotState): void {
   const cell = bot.rng.pick(free.length > 0 ? free : spawns);
 
   bot.alive = true;
-  bot.health = state.config.healthMax;
+  bot.health = bot.healthMax;
   bot.armor = 0;
   bot.shield = 0;
   bot.powerups.clear();

@@ -13,6 +13,7 @@ const SIM_DIRS = [
   "meta",
   "names",
   "report",
+  "delve",
 ];
 
 export default tseslint.config(

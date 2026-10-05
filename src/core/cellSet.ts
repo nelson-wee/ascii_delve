@@ -37,6 +37,18 @@ export class CellSet {
     this.count += 1;
   }
 
+  /**
+   * Call `visit` for every cell of the set, in index order. It reads the whole
+   * array, so it costs the capacity and not the size.
+   */
+  forEach(visit: (index: number) => void): void {
+    if (this.count === 0) return;
+    const { stamps, current } = this;
+    for (let index = 0; index < stamps.length; index += 1) {
+      if (stamps[index] === current) visit(index);
+    }
+  }
+
   has(index: number): boolean {
     return index >= 0 && index < this.capacity && this.stamps[index] === this.current;
   }

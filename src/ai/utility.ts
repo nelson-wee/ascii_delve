@@ -19,7 +19,8 @@
  * - Each tactic has a cost and a benefit.
  * - A bot keeps its action unless a new action scores higher by a margin.
  */
-import { isWalkable, tileAt } from "../arena/types.js";
+import { cellIndex, inBounds, isWalkable, tileAt } from "../arena/types.js";
+import type { CellSet } from "../core/cellSet.js";
 import type { Cell } from "../core/types.js";
 import type { Tactics } from "../core/schemas.js";
 import { RANGE_BANDS, type RangeBand, type Weapon } from "../weapons/types.js";
@@ -52,6 +53,7 @@ export type Action =
   | { kind: "Reposition"; band: RangeBand }
   | { kind: "Follow"; teammateId: string }
   | { kind: "Support"; teammateId: string }
+  | { kind: "Explore"; cell: Cell }
   | { kind: "Idle" };
 
 export type ActionKind = Action["kind"];
@@ -75,6 +77,8 @@ export function actionLabel(action: Action): string {
       return `Follow(${action.teammateId})`;
     case "HoldPosition":
       return `HoldPosition(${action.cell.x},${action.cell.y})`;
+    case "Explore":
+      return `Explore(${action.cell.x},${action.cell.y})`;
     default:
       return action.kind;
   }
@@ -136,8 +140,8 @@ function teamModifier(state: SimState, action: Action, bot: BotState): number {
 // ---------------------------------------------------------------------------
 
 /** The health of a bot as a part of the full health. */
-export function healthFraction(state: SimState, bot: BotState): number {
-  return state.config.healthMax === 0 ? 0 : bot.health / state.config.healthMax;
+export function healthFraction(_state: SimState, bot: BotState): number {
+  return bot.healthMax === 0 ? 0 : bot.health / bot.healthMax;
 }
 
 /** The middle distance of a range band, in cells. */
@@ -292,7 +296,7 @@ function teammateInFight(
     }
     if (enemies === 0) continue;
     const pressed = Math.min(1, enemies / Math.max(1, config.teamSize));
-    const hurt = 1 - Math.max(0, mate.health) / Math.max(1, config.healthMax);
+    const hurt = 1 - Math.max(0, mate.health) / Math.max(1, mate.healthMax);
     const urgency =
       pressed * (1 - config.supportHurtShare) + hurt * config.supportHurtShare;
     if (urgency > bestUrgency) {
@@ -706,6 +710,23 @@ export function scoreActions(state: SimState, bot: BotState): ScoredAction[] {
     }
   }
 
+  // Explore: walk to ground that the team has not seen (a delve).
+  //
+  // Benefit: a level is cleared only when the party finds every mob, and a mob
+  // waits in its room until it sees the party. Cost: the party walks into rooms
+  // it knows nothing about. It is scored only while no enemy is in sight, so a
+  // fight always comes first.
+  if (!enemy) {
+    const goal = exploreGoal(state, bot);
+    if (goal !== null) {
+      push(
+        { kind: "Explore", cell: goal },
+        base["explore"] ?? 1,
+        0.5 + tactics.aggression,
+      );
+    }
+  }
+
   // Follow: a teammate is far away (cohesion).
   const mate = nearestTeammate(state, bot);
   if (mate) {
@@ -1108,11 +1129,95 @@ export function applyAction(state: SimState, bot: BotState, action: Action): voi
       }
       return;
     }
+    case "Explore": {
+      if (!pathTo(state, bot, action.cell)) {
+        // Nothing reaches it, so search again at the next decision.
+        bot.exploreGoal = null;
+        bot.exploreGoalTick = -Infinity;
+        bot.path = [];
+      }
+      return;
+    }
     case "HoldPosition":
     case "Idle":
     default:
       bot.path = [];
   }
+}
+
+/**
+ * The cell that a bot of an exploring team walks to, or `null`.
+ *
+ * It is the nearest walkable cell that the team has not seen, by a walk over
+ * the floor. When the team has seen all of the level and an enemy is still
+ * alive, it is the cell of the nearest living enemy: the party knows that the
+ * level is not clear, so it hunts.
+ *
+ * The answer is kept on the bot until the team sees that cell, or for
+ * `takePositionIntervalTicks`, because the walk costs the whole floor.
+ */
+export function exploreGoal(state: SimState, bot: BotState): Cell | null {
+  const explored = state.explored[bot.teamId];
+  if (!explored) return null;
+  const { map } = state;
+  const kept = bot.exploreGoal;
+  if (
+    kept !== null &&
+    state.tick - bot.exploreGoalTick < state.config.takePositionIntervalTicks &&
+    !explored.has(cellIndex(map, kept.x, kept.y))
+  ) {
+    return kept;
+  }
+  bot.exploreGoalTick = state.tick;
+  bot.exploreGoal = nearestUnexplored(state, bot, explored) ?? nearestEnemyCell(state, bot);
+  return bot.exploreGoal;
+}
+
+const EXPLORE_STEPS: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+];
+
+/** A breadth-first walk from the bot to the first cell the team has not seen. */
+function nearestUnexplored(state: SimState, bot: BotState, explored: CellSet): Cell | null {
+  const { map } = state;
+  const start = botCell(bot);
+  const seen = new Uint8Array(map.width * map.height);
+  const queue: number[] = [cellIndex(map, start.x, start.y)];
+  seen[queue[0] as number] = 1;
+  for (let head = 0; head < queue.length; head += 1) {
+    const index = queue[head] as number;
+    const x = index % map.width;
+    const y = (index - x) / map.width;
+    if (!explored.has(index)) return { x, y };
+    for (const [dx, dy] of EXPLORE_STEPS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (!inBounds(map, nx, ny) || !isWalkable(tileAt(map, nx, ny))) continue;
+      const next = cellIndex(map, nx, ny);
+      if (seen[next] === 1) continue;
+      seen[next] = 1;
+      queue.push(next);
+    }
+  }
+  return null;
+}
+
+/** The cell of the nearest living enemy, or `null` if there is none. */
+function nearestEnemyCell(state: SimState, bot: BotState): Cell | null {
+  let best: BotState | null = null;
+  let bestDistance = Infinity;
+  for (const other of state.bots) {
+    if (!other.alive || other.teamId === bot.teamId) continue;
+    const distance = distanceBetween(bot, other);
+    if (distance < bestDistance) {
+      best = other;
+      bestDistance = distance;
+    }
+  }
+  return best === null ? null : botCell(best);
 }
 
 /** Re-export for the tests. */

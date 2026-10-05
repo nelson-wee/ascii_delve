@@ -315,7 +315,7 @@ function readyValue(state: SimState, bot: BotState, pickup: PickupState): number
 
   switch (pickup.point.kind) {
     case "health": {
-      const missing = 1 - bot.health / state.config.healthMax;
+      const missing = 1 - bot.health / bot.healthMax;
       return missing * 1.4;
     }
     case "armor": {
@@ -384,8 +384,8 @@ export function takePickup(state: SimState, bot: BotState, pickup: PickupState):
 
   switch (pickup.point.kind) {
     case "health": {
-      if (bot.health >= state.config.healthMax) break;
-      bot.health = Math.min(state.config.healthMax, bot.health + (kindData?.amount ?? 0));
+      if (bot.health >= bot.healthMax) break;
+      bot.health = Math.min(bot.healthMax, bot.health + (kindData?.amount ?? 0));
       took = true;
       break;
     }
@@ -480,7 +480,7 @@ export function takePickup(state: SimState, bot: BotState, pickup: PickupState):
 export function applyPickups(state: SimState): void {
   if (state.pickups.length === 0) return;
   for (const bot of botsInTickOrder(state)) {
-    if (!bot.alive) continue;
+    if (!bot.alive || !bot.takesPickups) continue;
     const cell = botCell(bot);
     const index = cellIndex(state.map, cell.x, cell.y);
     const pickup = state.pickupByCell.get(index);

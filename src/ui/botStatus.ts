@@ -110,23 +110,25 @@ export function createBotStatus(options: BotStatusOptions): BotStatusPanel {
         for (const row of rows) row.root.hidden = true;
         return;
       }
-      const full = Math.max(1, state.config.healthMax);
+      // A delve shows the party only: a level can hold a dozen mobs, and the
+      // panel is for what the player's own bots can do next.
+      const shown = state.config.endRule === "clear" ? state.bots.filter((bot) => bot.teamId === "A") : state.bots;
 
-      for (const [index, bot] of state.bots.entries()) {
+      for (const [index, bot] of shown.entries()) {
         const row = rowAt(index);
         row.root.hidden = false;
         const color = bot.teamId === "B" ? theme.teamB : theme.teamA;
         setStyle(row.root, "--team", color);
         row.root.classList.toggle("down", !bot.alive);
 
-        setText(row.name, `${bot.id} ${bot.role.slice(0, 4)}`);
+        setText(row.name, bot.id === bot.label ? bot.label : `${bot.id} ${bot.label.slice(0, 4)}`);
 
         if (!bot.alive) {
           // A dead bot says when it comes back, and nothing else: its weapon
           // and its armour are gone until it does (Section 7.20.17).
           const left = Math.max(0, bot.respawnAtTick - state.tick);
           const seconds = left / state.config.ticksPerSecond;
-          setText(row.weapon, `down, back in ${seconds.toFixed(1)} s`);
+          setText(row.weapon, state.config.respawn ? `down, back in ${seconds.toFixed(1)} s` : "fallen");
           setText(row.ammo, "");
           setText(row.health, "");
           setText(row.armor, "");
@@ -139,7 +141,7 @@ export function createBotStatus(options: BotStatusOptions): BotStatusPanel {
         row.weapon.title = `${bot.weapon.archetype} · ${bot.weapon.tier}`;
         setText(row.ammo, ammoText(bot));
 
-        const share = Math.max(0, Math.min(1, bot.health / full));
+        const share = Math.max(0, Math.min(1, bot.health / Math.max(1, bot.healthMax)));
         setStyle(row.bar, "width", `${(share * 100).toFixed(0)}%`);
         setStyle(row.bar, "background", share > 0.35 ? color : "#ff4d4d");
         setText(row.health, String(Math.max(0, Math.round(bot.health))));
@@ -149,7 +151,7 @@ export function createBotStatus(options: BotStatusOptions): BotStatusPanel {
         setText(row.powerups, powerupText(bot));
       }
 
-      for (let index = state.bots.length; index < rows.length; index += 1) {
+      for (let index = shown.length; index < rows.length; index += 1) {
         const row = rows[index];
         if (row) row.root.hidden = true;
       }

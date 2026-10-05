@@ -313,6 +313,8 @@ export const TuningSchema = z
             takePosition: positiveNumber,
             /** Go to a fight a teammate is already in (Section 7.44). */
             support: positiveNumber,
+            /** Walk to ground the team has not seen (a delve party). */
+            explore: positiveNumber,
           })
           .strict(),
       })
@@ -913,3 +915,85 @@ export const ArenaProfilesSchema = z
   .strict();
 
 export type ArenaProfiles = z.infer<typeof ArenaProfilesSchema>;
+
+/** A weapon of a mob, built on the baseline weapon (`delve/mobs.ts`). */
+const MobWeaponSchema = z
+  .object({
+    name: z.string().min(1),
+    attackType: z.enum(["hitscan", "projectile", "cone"]),
+    damage: positiveNumber,
+    fireIntervalTicks: positiveInt,
+    rangeMax: positiveNumber,
+    optimalRange: positiveNumber,
+    rangeTolerance: positiveNumber,
+    /** Cells per tick. Only a `projectile` weapon reads it. */
+    projectileSpeed: positiveNumber.optional(),
+    /** Half the width of a `cone`, in degrees. */
+    coneHalfAngleDegrees: positiveNumber.optional(),
+  })
+  .strict();
+
+const ActorSchema = z
+  .object({
+    name: z.string().min(1),
+    role: RoleSchema,
+    healthMax: positiveNumber,
+    moveSpeedScale: positiveNumber,
+  })
+  .strict();
+
+/** `data/delve.json`: the party classes, the mobs, and the levels of a delve. */
+export const DelveSchema = z
+  .object({
+    _notes: z.string().optional(),
+    /** A safety limit. A level that reaches it ends with no winner. */
+    timeLimitTicks: positiveInt,
+    styles: z.array(z.enum(["bastion", "openfield", "cavern"])).min(1),
+    weaponsPerRun: positiveInt,
+    classes: z.record(z.string().min(1), ActorSchema),
+    /** The class of each party slot, in order. */
+    party: z.array(z.string().min(1)).length(3),
+    /**
+     * The behavior weights that every party member takes over the weights of
+     * its role. A tournament role holds ground because the clock makes the
+     * other team come to it; a level has mobs that wait, so the party must go
+     * to them.
+     */
+    partyBehavior: z.record(z.string().min(1), z.number().min(0)),
+    mobs: z.record(z.string().min(1), ActorSchema.extend({ weapon: MobWeaponSchema }).strict()),
+    /** The behavior weights that every mob takes over the weights of its role. */
+    mobBehavior: z.record(z.string().min(1), z.number().min(0)),
+    /** The tactics that every mob takes over the tactics of its role. */
+    mobTactics: TacticsSchema.partial(),
+    levels: z
+      .object({
+        packsBase: z.number().min(1),
+        packsPerDepth: z.number().min(0),
+        packsMax: positiveInt,
+        packSizeMin: positiveInt,
+        packSizeMax: positiveInt,
+        /** Each depth after the first adds this share to the health of a mob. */
+        mobHealthPerDepth: z.number().min(0),
+        /** Each depth after the first adds this share to the damage of a mob. */
+        mobDamagePerDepth: z.number().min(0),
+        /** A pack stands at least this share of the longest walk from the party. */
+        minDistanceShare: unitRange,
+        /** Pack centres stand at least this many steps apart. */
+        packSpacingSteps: positiveInt,
+        /** How often each kind of mob is drawn, by mob id. */
+        kindWeights: z.record(z.string().min(1), z.number().min(0)),
+      })
+      .strict(),
+  })
+  .strict()
+  .refine((value) => value.party.every((id) => id in value.classes), "party names a class that is not in classes")
+  .refine(
+    (value) => Object.keys(value.levels.kindWeights).every((id) => id in value.mobs),
+    "kindWeights names a mob that is not in mobs",
+  )
+  .refine(
+    (value) => value.levels.packSizeMin <= value.levels.packSizeMax,
+    "packSizeMin is more than packSizeMax",
+  );
+
+export type Delve = z.infer<typeof DelveSchema>;

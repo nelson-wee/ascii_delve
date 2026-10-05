@@ -17,6 +17,7 @@ const SIM_DIRS = [
   "meta",
   "names",
   "report",
+  "delve",
 ];
 
 function listTsFiles(dir: string): string[] {

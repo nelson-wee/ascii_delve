@@ -202,7 +202,7 @@ export function damageBot(
   // One hit that takes a large share of full health. A crit is not what drops
   // a bot from near full health; a single sniper shot is, and it read 85 to
   // 194 against 100 health in the measurement of Section 7.24.
-  if (left >= state.config.healthMax * state.config.heavyHitShare) {
+  if (left >= target.healthMax * state.config.heavyHitShare) {
     state.bus.emit("Announcement", tick, roundNumber, {
       kind: "heavyHit",
       botId: attacker.id,

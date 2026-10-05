@@ -115,7 +115,6 @@ export class SimArenaView implements ArenaView {
   bots(): GridBot[] {
     const { state } = this;
     if (!state) return [];
-    const full = Math.max(1, state.config.healthMax);
     return state.bots.map((bot) => {
       const now = this.cellOf(bot.pos);
       const last = this.previous.get(bot.id) ?? now;
@@ -124,7 +123,7 @@ export class SimArenaView implements ArenaView {
       return {
         id: bot.id,
         teamId: bot.teamId === "B" ? "B" : "A",
-        hp01: bot.health / full,
+        hp01: bot.health / Math.max(1, bot.healthMax),
         x: now.x,
         y: now.y,
         prevX: from.x,

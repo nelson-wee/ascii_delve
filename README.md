@@ -1,125 +1,49 @@
-# ASCII Bot Shooter
+# ASCII Delve
 
-An ASCII team shooter tournament with indirect control. The player sets the
-tactics of a team of three bots. The bots fight. The player does not control a
-bot directly.
+A party of three bots — a fighter, a thief and a wizard — goes down into a
+dungeon. The bots act on their own AI. The player does not control a bot. The
+player decides when the party goes deeper and when it comes back to town.
 
-The full design is in [`docs/dev-guide.md`](docs/dev-guide.md). The measured
-state of the weapons and the balance after M8 is in
-[`docs/m8-weapon-analysis.md`](docs/m8-weapon-analysis.md).
+ASCII Delve is a fork of
+[`ascii_tournament`](https://github.com/nelson-wee/ascii_tournament), an ASCII
+team shooter with indirect control. It keeps the engine of the tournament: the
+arena generators, the utility AI, the combat, and the neon ASCII display.
+
+[`docs/delve.md`](docs/delve.md) gives the design of the delve: the game loop,
+what changed in the engine, the classes, the mobs, the levels, the measurements,
+and the known issues. [`docs/dev-guide.md`](docs/dev-guide.md) is the design of
+the engine, written for the tournament.
 
 ## Status
 
-**After M8 — the weapon economy.** A bot spawns with the baseline weapon alone
-and takes the generated weapons from the weapon points of the arena, which makes
-the arena decide who is armed. A pair of points that face each other holds the
-same item, so a symmetric arena gives both teams the same offer. A cone now
-declares the range it really has, the power budget weighs the range bands the
-way the arena fires in them, a projectile leads a moving target and carries its
-critical hit, and the AI aims an area weapon at the enemy that lines up two. A
-pickup point shows its glyph only while it holds its item.
+**First version.** The game loop works in the browser:
 
-A second pass made the arena decide the contest and gave a weapon choice a
-price. An arena must now pass `checkArenaFairness`: a power-up and at least one
-weapon point sit on ground that both teams reach together, which is an
-acceptance rule for the generator of Milestone M7. The `retreatThreshold` tactic
-is gone — a bot takes health or armour only when it has no enemy to engage,
-while weapons, ammo and power-ups stay worth fighting for — and a weapon swap
-costs firing ticks inside a fight but nothing outside one, so a team arms itself
-by its role and its doctrine before contact.
+1. In town, select **Enter the dungeon**.
+2. The party explores a generated level and fights the packs of mobs.
+3. When the level ends, select **Venture deeper** (the party keeps its health,
+   armour, weapons and ammo) or **Return to town** (the run ends).
 
-A third pass added the **Redeemer**: a power-up that hands over one shot, a slow
-homing projectile with a six-cell blast that kills a whole bot at the centre,
-leaves one alive at the edge, and can be shot down in the air — where it
-detonates on the spot. It is a fixed file outside the power budget, because a
-single event is not a damage-per-second profile. Power-ups now spawn about three
-times in a round, and one match in four offers a Redeemer.
+Over 60 delves that always go deeper, the median party clears 4 levels, and the
+best clears 6. Depth 5 is a wall for now (see the known issues in
+`docs/delve.md`).
 
-Over 1080 rounds: aggressive 53.9 %, anchor 40.9 %, balanced 55.0 %, no balance
-failure, and every round reaches the score limit. The tournament weapon priority
-is now worth 11 points of win rate, and item control fell from a 36-point spread
-to 20. [`docs/m8-weapon-analysis.md`](docs/m8-weapon-analysis.md) holds the
-measurements and the questions that are still open.
-[`docs/m8-weapon-analysis.md`](docs/m8-weapon-analysis.md) holds the
-measurements and the two balance questions that are still open.
+## The delve harness
 
-**A main menu, and matches that follow each other.** `npm run dev` opens a menu
-with two modes. **Tournament** plays best-of-3 matches one after another: every
-match builds a new arena and the three styles take their turn, so a match that
-is lost is followed by the next one instead of an end screen. **Test arena**
-holds one style and builds a new arena and a new weapon set on every press.
-Between matches a screen says who won, how the session stands, and what the
-ground ahead looks like in plain words.
+`npm run delve` runs delves with no display. Every delve goes deeper while a
+party member is standing.
 
-**Milestone M7 (first pass) — arena generation.** Three generators, each with
-its own algorithm and its own shape of fight: `bastion` carves a grid of rooms
-and corridors and fights at 8.4 cells, `cavern` grows a cave from noise with a
-cellular automaton and fights at 10.6, and `openfield` starts from an open field
-and drops obstacles into it, which keeps the fire lanes and gives it five times
-the long-range share of the hand-made arena. Every style runs one pipeline —
-turn the first half onto the second, join what the turn broke, place the spawns
-and the pickups on ground both teams reach together, measure, and reject an
-arena that fails a rule — so fairness is not a style question.
+```
+npm run delve                                # 40 delves, to depth 10
+npm run delve -- --runs 100 --depth 15 --seed 7
+```
 
-`npm run arena` prints an arena and its metrics. `npm run arena -- --stats 25`
-compares the styles. The batch harness takes `gen:<style>:<seed>` as an arena,
-so a style can be measured in play. The macro graph of Section 7.2 step 1 is
-still to come.
+It prints, for each depth, how many parties reached it, how many cleared it,
+how many were wiped, how many hit the time limit, the mean time of a level, and
+the mean number of mobs. Then it prints the deepest level cleared and the depth
+at which each class fell.
 
-**Milestone M8 — teams, roles, matches, and pickups.** A full best-of-3 match
-plays in the browser. Between the rounds the tactics screen opens and the
-player sets the tactics and the role of each bot. The arena now gives a reason
-to move: health, armor, universal ammo, a weapon point, and the two power-ups
-of the classic arena shooter (double damage and a shield belt), each on its own
-respawn timer, from one spawn table per match. Each team has three roles
-(tank, overwatch, skirmisher), and the influence maps give the AI a danger map
-and a control map.
-
-The pickups changed the game more than any milestone before: a round went from
-10.9 kills in 5125 ticks to 25.9 kills in 2030 ticks, 98 % of rounds now reach
-the score limit, and the preset that holds its ground fell from 82 % to 42.5 %.
-The batch reports a win rate per role composition, and a rush composition beats
-a turtle composition by 8 points. Sections 7.20.13 and 7.20.14 of the dev guide
-hold the measurements and the three faults they found, among them an arena that
-was symmetric to the cell and still gave one side the better start.
-
-**Milestone M6 — weapon generation.** A run gets five weapons: one fixed
-baseline and four generated from a role trait (precise, assault, sniper, heavy)
-and one of seven attack types (hitscan, projectile, cone, burst, line, ricochet,
-tile). Every generated weapon costs the same power budget, and its archetype is
-a label that the generator derives at the end. Combat gained area damage,
-projectiles, hazard tiles, damage over time, a crit against a target that stands
-still, a dodge for one that moves, and an order of fire that comes from the
-reaction speed of the bot and its weapon.
-
-The power budget trades four things, not one: an area weapon pays for its power
-in reach, in magazine size, and in cadence before it pays in damage. A run holds
-a clear tier ranking (`prize`, `strong`, `standard`), and ammo is counted, so an
-empty weapon drops a bot back to the baseline.
-
-**Milestone M5.5 — directional vision (off).** A bot can have a facing, a narrow
-focus arc where it can fire, a wide peripheral arc where it only notices, and a
-turn rate. The batch says the change did not move the balance, and Section
-7.20.10 of the dev guide says why. `perception.directionalVision` in
-`data/tuning.json` turns it on; it is off until the pickups of Milestone M8
-give a reason to cross the arena.
-
-**Milestone M5 — headless batch harness.** `npm run batch` runs rounds in Node
-with no display and prints a win-rate table, the round end reasons, the weapon
-use, and any balance failure. It writes three CSV files. Weapon generation
-arrives with Milestone M6.
-
-**Milestone M4 — utility AI and tactics.** Each bot gives a score to every
-action (engage, chase, retreat, seek a pickup, hold, reposition, switch weapon,
-follow) and takes the highest. The tactics of the player are the weights. A
-round with an equal score at the time limit goes to sudden death. The kill feed
-carries the classic arena shooter announcements. The headless batch harness
-arrives with Milestone M5.
-
-Earlier milestones gave the build, the seeded RNG, the data loader, the event
-bus, the tests, the GitHub Pages deployment (M0), the arena map files with the
-rot.js display (M1), A* movement with the tick loop and the speed controls (M2),
-and FOV, the baseline weapon, and the round end condition (M3).
+`data/delve.json` holds the numbers: the classes, the mobs, the weights that
+make a party and a mob, and the level curve.
 
 ## Commands
 
@@ -133,7 +57,8 @@ and FOV, the baseline weapon, and the round end condition (M3).
 | `npm run test:watch` | Run the tests and watch for changes. |
 | `npm run typecheck` | Typecheck only. |
 | `npm run lint` | Run ESLint. |
-| `npm run batch` | Run the headless batch harness (see below). |
+| `npm run delve` | Run delves with no display and print how deep the party gets. |
+| `npm run batch` | Run the tournament batch harness (see below). |
 | `npm run arena` | Print a generated arena and its metrics (see below). |
 
 ## Rules for the code
@@ -142,21 +67,26 @@ These rules come from Sections 4 and 13 of the dev guide.
 
 1. The simulation and the display are separate. A module in `src/core`,
    `src/arena`, `src/weapons`, `src/sim`, `src/ai`, `src/progression`,
-   `src/meta`, `src/names`, or `src/report` must not import `src/render`,
-   `src/ui`, or `src/main.ts`, and must not use a browser API.
+   `src/meta`, `src/names`, `src/report`, or `src/delve` must not import
+   `src/render`, `src/ui`, or `src/main.ts`, and must not use a browser API.
 2. Headless first. Every system must run in Node with no display.
 3. Deterministic. One seed gives one result.
 4. Use the RNG streams of `src/core/rng.ts`. Do not use `Math.random()` or the
    global `ROT.RNG` instance.
 5. Tunable numbers go in `data/`, not in the code. A placeholder number is
-   listed in the `tbd` array of its data file.
-6. Implement the milestones of Section 11 of the dev guide in order. Do not
-   implement a feature before its milestone.
+   listed in the `tbd` array of its data file, or marked TBD in its notes.
+6. A change to the engine must leave the tournament round as it was, while the
+   tournament code is still in the repository. Its tests check this.
 
 The ESLint configuration and the test `tests/boundary.test.ts` check rules 1
 and 4 automatically.
 
-## The batch harness
+## The tournament tools
+
+The tools below come from the tournament. They still work and still have tests.
+They are a reference while the delve grows, and a later version removes them.
+
+### The batch harness
 
 `npm run batch` runs rounds with no display and reports the balance.
 
@@ -179,7 +109,7 @@ It writes `rounds.csv`, `matchups.csv`, and `presets.csv` into the output
 folder. With `--fail-on-balance` the command ends with a non-zero exit code
 when it finds a balance failure, so a workflow can use it as a gate.
 
-## Arena generation
+### Arena generation
 
 `npm run arena` builds an arena and prints it in the glyphs of the map files, so
 a generated arena can be read by eye and saved as a hand-made one.
@@ -203,7 +133,7 @@ one. Every arena must pass `checkArenaFairness`: a power-up point and one weapon
 point on ground that both teams reach together, and every pickup point paired
 with the point it faces.
 
-## Arena map files
+### Arena map files
 
 A file in `data/arenas/` holds one hand-made arena. The file has an optional
 header, a line with `---`, and then the map:

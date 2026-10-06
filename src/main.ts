@@ -12,13 +12,13 @@
  */
 import { loadDelve } from "./core/data.js";
 import { EventBus, type GameEvent } from "./core/events.js";
-import { deriveSeed } from "./core/rng.js";
 import { packCount, styleAt } from "./delve/level.js";
 import type { LevelSetup } from "./delve/level.js";
+import { autoEquip, createRoster, discard, equip, type Roster } from "./delve/roster.js";
 import {
   canGoDeeper,
   createRun,
-  deepestCleared,
+  returnToTown,
   finishLevel,
   nextLevel,
   startLevel,
@@ -32,6 +32,7 @@ import { SimRunner, type Frame, type Speed } from "./render/runner.js";
 import type { WeaponVisualHints } from "./render/vfxLayer.js";
 import { simConfigFromTuning, step, type SimState } from "./sim/index.js";
 import { createBotStatus } from "./ui/botStatus.js";
+import { clearRoster, readRoster, writeRoster } from "./ui/saveStore.js";
 import { openLevelOverScreen, openTownScreen, type Screen } from "./ui/screens.js";
 import { createSpeedControls } from "./ui/speedControls.js";
 
@@ -41,14 +42,14 @@ const KILL_FEED_LINES = 8;
 const PROJECTILE_PREFIX = "projectile:";
 
 /**
- * The seed of this visit. `#seed=123` in the address replays a visit; the clock
- * gives a new one. Each run of the visit takes its own sub-seed (Section 7.1).
+ * The seed of a new roster. `#seed=123` in the address picks it; the clock
+ * gives one otherwise. A saved roster keeps its own seed, and each delve takes
+ * a sub-seed of it (Section 7.1).
  */
 function openingSeed(): number {
   const match = /seed=(\d+)/.exec(window.location.hash);
   return match ? Number(match[1]) : Math.floor(Date.now() / 1000);
 }
-const SEED = openingSeed();
 
 function showError(error: unknown): void {
   const box = document.createElement("pre");
@@ -134,18 +135,20 @@ try {
   const botStatus = createBotStatus({ container: botsHost });
   const stageEl: HTMLElement = stageHost;
 
-  const stage = new NeonStage(arenaHost, { seed: SEED });
+  // The saved roster, or a new one. A save is never thrown away for a seed in
+  // the address: the address only seeds a roster that does not exist yet.
+  let roster: Roster = readRoster() ?? createRoster(openingSeed());
+  writeRoster(roster);
+
+  const stage = new NeonStage(arenaHost, { seed: roster.seed });
   const view = new SimArenaView({ directional: false });
   stage.setTheme(DEFAULT_THEME);
   legendEl.innerHTML = buildLegend(DEFAULT_THEME);
 
   // ------------------------------------------------------------------------
-  // The state of the visit. A run lasts from "Enter" to "Return to town".
+  // The state of the visit. A delve lasts from "Enter" to "Return to town".
   // ------------------------------------------------------------------------
-  let runCount = 0;
-  let bestDepth = 0;
   let run: DelveRun | null = null;
-  let lastRun: DelveRun | null = null;
   let setup: LevelSetup | null = null;
   let bus = new EventBus();
   let state: SimState | null = null;
@@ -271,10 +274,9 @@ try {
   // The delve loop
   // ------------------------------------------------------------------------
 
-  /** Start a new run at depth 1. */
+  /** Start a new delve at depth 1, with the heroes as their loadouts make them. */
   function enterDungeon(): void {
-    runCount += 1;
-    run = createRun(deriveSeed(SEED, `run:${runCount}`));
+    run = createRun(roster);
     startNextLevel();
   }
 
@@ -297,7 +299,7 @@ try {
     drawnEvents = -1;
 
     metaEl.textContent = [
-      `Run ${runCount}`,
+      `Delve ${run.delveNumber}`,
       setup.arena.name,
       `${setup.arena.width}×${setup.arena.height}`,
       theme.name,
@@ -318,7 +320,6 @@ try {
     updatePanel();
 
     const record = finishLevel(current, setup, state);
-    bestDepth = Math.max(bestDepth, deepestCleared(current));
     const delve = loadDelve();
     const packs = packCount(current.depth, delve);
     screen = openLevelOverScreen({
@@ -333,7 +334,8 @@ try {
       },
       onTown: () => {
         closeScreen();
-        lastRun = current;
+        returnToTown(roster, current);
+        writeRoster(roster);
         run = null;
         showTown();
       },
@@ -354,18 +356,36 @@ try {
     view.setState(null);
     stage.vfx.clear();
     statusEl.textContent = "In town.";
-    metaEl.textContent = `town  ·  seed ${SEED}`;
+    metaEl.textContent = `town  ·  seed ${roster.seed}`;
     scoreEl.textContent = "";
     feedEl.replaceChildren();
     drawnEvents = -1;
     screen = openTownScreen({
       container: stageEl,
-      lastRun,
-      bestDepth,
-      seed: SEED,
+      roster,
+      seed: roster.seed,
+      onEquip: (heroIndex, slot, uid) => {
+        equip(roster, heroIndex, slot, uid);
+        writeRoster(roster);
+      },
+      onAutoEquip: () => {
+        autoEquip(roster);
+        writeRoster(roster);
+      },
+      onDiscard: (uid) => {
+        discard(roster, uid);
+        writeRoster(roster);
+      },
       onEnter: () => {
         closeScreen();
         enterDungeon();
+      },
+      onReset: () => {
+        clearRoster();
+        roster = createRoster(Math.floor(Date.now() / 1000));
+        writeRoster(roster);
+        closeScreen();
+        showTown();
       },
     });
   }

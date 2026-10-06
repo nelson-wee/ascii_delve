@@ -462,6 +462,8 @@ export interface BotSpec {
   healthMax?: number;
   /** A factor on the move speed of the tuning. */
   moveSpeedScale?: number;
+  /** Replaces part of the attributes of the round (equipment changes them). */
+  attributes?: Partial<Attributes>;
   /** The weapons that the bot holds at the start. The first is its fallback. */
   weapons?: readonly Weapon[];
   takesPickups?: boolean;
@@ -924,7 +926,7 @@ export function createSimState(options: CreateSimStateOptions): SimState {
           slot,
           rng: createRng(deriveSeed(seed, `${teamId}:bot:${slot}`), `sim/${teamId}${slot}`),
           config,
-          attributes: { ...attributes },
+          attributes: { ...attributes, ...spec.attributes },
           tactics: { ...(roleData?.tactics ?? loadDefaultTactics()), ...spec.tactics },
           role: spec.role,
           roleBehavior: { ...roleData?.behavior, ...spec.behavior },

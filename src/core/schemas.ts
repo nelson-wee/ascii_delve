@@ -942,6 +942,18 @@ const ActorSchema = z
   })
   .strict();
 
+/** A piece of armour or a trinket, before its quality. */
+const GearBaseSchema = z
+  .object({
+    name: z.string().min(1),
+    healthMax: z.number().optional(),
+    moveSpeedScale: z.number().optional(),
+    accuracy: z.number().optional(),
+  })
+  .strict();
+
+const TIER_NAMES = ["standard", "strong", "prize"] as const;
+
 /** `data/delve.json`: the party classes, the mobs, and the levels of a delve. */
 export const DelveSchema = z
   .object({
@@ -965,6 +977,39 @@ export const DelveSchema = z
     mobBehavior: z.record(z.string().min(1), z.number().min(0)),
     /** The tactics that every mob takes over the tactics of its role. */
     mobTactics: TacticsSchema.partial(),
+    rewards: z
+      .object({
+        _notes: z.string().optional(),
+        itemsPerClear: z.number().int().min(0),
+        /** One more item on every depth that is a multiple of this. */
+        bonusItemEveryDepths: positiveInt,
+        kindWeights: z.object({ weapon: z.number().min(0), armor: z.number().min(0), trinket: z.number().min(0) }).strict(),
+        /** Each depth after the first adds this share to the quality of an item. */
+        qualityPerDepth: z.number().min(0),
+        /** The quality of an item is its depth value times 1 ± this share. */
+        qualitySpread: unitRange,
+        /** The weights of the weapon tiers, from a depth on. Sorted by depth. */
+        weaponTiers: z
+          .array(
+            z
+              .object({
+                fromDepth: positiveInt,
+                weights: z.record(z.enum(TIER_NAMES), z.number().min(0)),
+              })
+              .strict(),
+          )
+          .min(1),
+      })
+      .strict(),
+    gear: z
+      .object({
+        _notes: z.string().optional(),
+        armor: z.array(GearBaseSchema).min(1),
+        trinket: z.array(GearBaseSchema).min(1),
+        /** What one unit of each stat is worth, in health points. */
+        value: z.object({ healthMax: z.number(), moveSpeedScale: z.number(), accuracy: z.number() }).strict(),
+      })
+      .strict(),
     levels: z
       .object({
         packsBase: z.number().min(1),

@@ -118,5 +118,81 @@
       "archer": 3,
       "brute": 1
     }
+  },
+  "rewards": {
+    "_notes": "What a clear gives (docs/delve.md, Section 10). The items go into the pack of the party; the party keeps them only when it returns to town. A wipe loses the pack. TBD",
+    "itemsPerClear": 1,
+    "bonusItemEveryDepths": 3,
+    "kindWeights": {
+      "weapon": 4,
+      "armor": 3,
+      "trinket": 3
+    },
+    "qualityPerDepth": 0.12,
+    "qualitySpread": 0.2,
+    "weaponTiers": [
+      {
+        "fromDepth": 1,
+        "weights": {
+          "standard": 6,
+          "strong": 2,
+          "prize": 0
+        }
+      },
+      {
+        "fromDepth": 3,
+        "weights": {
+          "standard": 3,
+          "strong": 4,
+          "prize": 1
+        }
+      },
+      {
+        "fromDepth": 6,
+        "weights": {
+          "standard": 1,
+          "strong": 4,
+          "prize": 3
+        }
+      }
+    ]
+  },
+  "gear": {
+    "_notes": "The armour and the trinkets of a reward. A bonus grows with the quality of the item; a penalty (a negative number) does not. `moveSpeedScale` adds to the speed factor of the class, and `accuracy` adds to the accuracy attribute. TBD `value` turns each stat into health points, so auto-equip can compare two items.",
+    "armor": [
+      {
+        "name": "Leather Vest",
+        "healthMax": 15
+      },
+      {
+        "name": "Chain Mail",
+        "healthMax": 30,
+        "moveSpeedScale": -0.05
+      },
+      {
+        "name": "Plate Armour",
+        "healthMax": 50,
+        "moveSpeedScale": -0.12
+      }
+    ],
+    "trinket": [
+      {
+        "name": "Ring of Focus",
+        "accuracy": 0.05
+      },
+      {
+        "name": "Boots of Haste",
+        "moveSpeedScale": 0.1
+      },
+      {
+        "name": "Amulet of Vigour",
+        "healthMax": 15
+      }
+    ],
+    "value": {
+      "healthMax": 1,
+      "moveSpeedScale": 150,
+      "accuracy": 400
+    }
   }
 }

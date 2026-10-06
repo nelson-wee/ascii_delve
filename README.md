@@ -16,16 +16,20 @@ the engine, written for the tournament.
 
 ## Status
 
-**First version.** The game loop works in the browser:
+**The town and the inventory.** The game loop works in the browser:
 
-1. In town, select **Enter the dungeon**.
-2. The party explores a generated level and fights the packs of mobs.
+1. In town, equip the heroes from the stash. Each hero has two weapon slots,
+   an armour slot and a trinket slot.
+2. Select **Enter the dungeon**. The party explores a generated level and
+   fights the packs of mobs. A clear puts loot in the pack.
 3. When the level ends, select **Venture deeper** (the party keeps its health,
-   armour, weapons and ammo) or **Return to town** (the run ends).
+   armour, weapons and ammo) or **Return to town** (the pack goes into the
+   stash, and town heals everyone). A wipe loses the pack. Equipped items are
+   never lost.
 
-Over 60 delves that always go deeper, the median party clears 4 levels, and the
-best clears 6. Depth 5 is a wall for now (see the known issues in
-`docs/delve.md`).
+The browser saves the roster, so a refresh keeps the heroes and the stash.
+After 10 delves with town visits, a party clears about 5 levels, where a fresh
+party clears about 3 (`docs/delve.md`, Section 10.6).
 
 ## The delve harness
 
@@ -35,6 +39,7 @@ party member is standing.
 ```
 npm run delve                                # 40 delves, to depth 10
 npm run delve -- --runs 100 --depth 15 --seed 7
+npm run delve -- --runs 12 --campaign 10     # 10 delves per roster, with town
 ```
 
 It prints, for each depth, how many parties reached it, how many cleared it,

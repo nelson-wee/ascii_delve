@@ -431,6 +431,66 @@
         cursor: pointer;
         box-shadow: 0 0 16px rgba(110, 247, 255, 0.35);
       }
+      /* The town (docs/delve.md, Section 10): heroes, slots, and the stash. */
+      .town { display: flex; flex-direction: column; gap: 8px; }
+      .hero {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px 8px;
+        border-left: 2px solid var(--team-a, var(--accent));
+        background: var(--panel);
+        border-radius: 4px;
+      }
+      .hero-head { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; font-size: 0.76rem; }
+      .hero-head .dim { font-size: 0.68rem; }
+      .slots { display: grid; grid-template-columns: 1fr; gap: 4px; }
+      @media (min-width: 640px) {
+        .slots { grid-template-columns: 1fr 1fr; }
+      }
+      .screen .slot {
+        display: grid;
+        grid-template-columns: 6.5em minmax(0, 1fr);
+        grid-template-areas: "tag name" "tag what";
+        align-items: baseline;
+        gap: 0 8px;
+        padding: 4px 10px;
+        min-height: 40px;
+      }
+      .screen .slot.open { border-color: var(--accent); }
+      .slot .slot-name { grid-area: tag; color: var(--dim); font-size: 0.68rem; }
+      .slot .slot-name.better { color: #7dffa8; }
+      .slot .slot-name.worse { color: #ff8a8a; }
+      .slot b { grid-area: name; font-weight: 600; overflow-wrap: anywhere; }
+      .slot .dim { grid-area: what; font-size: 0.64rem; overflow-wrap: anywhere; }
+      .picker {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 6px;
+        border: 1px dashed var(--line);
+        border-radius: 4px;
+      }
+      .stash {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+      }
+      .stash li {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 3px 6px;
+        background: var(--panel);
+        border-radius: 4px;
+      }
+      .stash-item { display: flex; flex-direction: column; min-width: 0; font-size: 0.72rem; }
+      .stash-item .dim { font-size: 0.64rem; overflow-wrap: anywhere; }
+      .screen .choice.small { min-height: 32px; padding: 0 10px; font-size: 0.68rem; flex: none; }
       .error {
         margin: auto;
         max-width: 40rem;

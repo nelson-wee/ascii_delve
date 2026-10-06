@@ -3,16 +3,15 @@
  *
  * The run holds the party between levels. After a level the player chooses:
  * go deeper, with the health, the armour, the weapons and the ammo that the
- * party has now, or go back to town, which ends the run. A party member that
- * falls stays down for the rest of the run.
+ * party has now, or go back to town, which ends the delve (`returnToTown`). A
+ * party member that falls stays down until the party is back in town.
  */
-import { loadDelve, loadRoles } from "../core/data.js";
+import { loadDelve } from "../core/data.js";
 import type { EventBus } from "../core/events.js";
 import { createRng, deriveSeed } from "../core/rng.js";
 import type { Delve } from "../core/schemas.js";
 import {
   carryOf,
-  weaponWeight,
   type BotCarry,
   type BotSpec,
   type Role,
@@ -21,16 +20,29 @@ import {
 } from "../sim/state.js";
 import { generateWeaponSet } from "../weapons/generate.js";
 import type { Weapon } from "../weapons/types.js";
+import { POWERUP_TIER } from "../weapons/types.js";
+import { rewardCount, rollItem, weaponItem, type Item } from "./items.js";
 import { buildLevel, createLevelState, levelConfig, partySpawns, type LevelSetup } from "./level.js";
+import {
+  heroStats,
+  isEquipped,
+  loadoutWeapons,
+  newUid,
+  type DelveSummary,
+  type Roster,
+} from "./roster.js";
 
 /** One member of the party, between two levels. */
 export interface PartyMember {
-  /** The class id of `data/delve.json`. It is also the bot id. */
+  /** The class id of `data/delve.json`. */
   classId: string;
+  /** The name of the class. It is also the bot id. */
   name: string;
   role: Role;
+  /** The stats of the hero with its gear on (`heroStats`). */
   healthMax: number;
   moveSpeedScale: number;
+  accuracy: number;
   carry: BotCarry;
 }
 
@@ -44,81 +56,63 @@ export interface LevelRecord {
   mobsKilled: number;
   /** The party members alive at the end. */
   partyAlive: number;
+  /** The names of the items that the clear put in the pack. */
+  loot: string[];
 }
 
 export interface DelveRun {
   seed: number;
+  /** The number of this delve in the roster, from 1. */
+  delveNumber: number;
   /** The depth of the next level. It starts at 1. */
   depth: number;
+  /** The weapons of the weapon points of the levels, with the baseline first. */
   weapons: readonly Weapon[];
   party: PartyMember[];
+  /** The loot of the clears. The party keeps it only if it gets back to town. */
+  pack: Item[];
   history: LevelRecord[];
   config: SimConfig;
 }
 
 /**
- * The weapon that a class starts with: the generated weapon of the run that its
- * role ranks highest, and a different one for each class while the run has
- * enough.
+ * A new delve: the heroes of the roster, at full health, with their loadouts,
+ * and a weapon set for the weapon points of its levels.
  */
-function starterWeapons(classes: readonly Role[], weapons: readonly Weapon[], config: SimConfig): Weapon[] {
-  const roles = loadRoles();
-  const pool = weapons.slice(1);
-  const claimed = new Set<string>();
-  const out: Weapon[] = [];
-  for (const role of classes) {
-    const tactics = roles.roles[role]?.tactics;
-    let best: Weapon | null = null;
-    let bestValue = -Infinity;
-    for (const weapon of pool) {
-      if (claimed.has(weapon.id) && claimed.size < pool.length) continue;
-      const mean = (weapon.dpsProfile.close + weapon.dpsProfile.mid + weapon.dpsProfile.long) / 3;
-      const value = tactics ? mean * weaponWeight(tactics, weapon.archetype, config.weaponPrefBonus) : mean;
-      if (value > bestValue) {
-        best = weapon;
-        bestValue = value;
-      }
-    }
-    const chosen = best ?? (weapons[0] as Weapon);
-    claimed.add(chosen.id);
-    out.push(chosen);
-  }
-  return out;
-}
-
-/** A new run: a weapon set and a fresh party at full health. */
-export function createRun(seed: number, options: { config?: SimConfig; delve?: Delve } = {}): DelveRun {
+export function createRun(roster: Roster, options: { config?: SimConfig; delve?: Delve } = {}): DelveRun {
   const delve = options.delve ?? loadDelve();
   const config = options.config ?? levelConfig(undefined, delve);
-  const weapons = generateWeaponSet(createRng(deriveSeed(seed, "weapons"), "weapons"), delve.weaponsPerRun, {
+  const delveNumber = roster.delves + 1;
+  const seed = deriveSeed(roster.seed, `delve:${delveNumber}`);
+  const set = generateWeaponSet(createRng(deriveSeed(seed, "weapons"), "weapons"), delve.weaponsPerRun, {
     ticksPerSecond: config.ticksPerSecond,
   });
-  const classes = delve.party.map((classId) => {
-    const data = delve.classes[classId];
-    if (!data) throw new Error(`data/delve.json has no class "${classId}"`);
-    return { classId, data };
-  });
-  const starters = starterWeapons(classes.map((entry) => entry.data.role), weapons, config);
-  const party = classes.map(({ classId, data }, index): PartyMember => {
-    const starter = starters[index] as Weapon;
-    const held = starter.id === weapons[0]?.id ? [starter] : [weapons[0] as Weapon, starter];
+  // A generated id names a role, an attack type and a place in its set, so two
+  // sets repeat ids. The delve number keeps them apart from the roster's items.
+  const weapons = set.map((weapon, index) => (index === 0 ? weapon : { ...weapon, id: `d${delveNumber}-${weapon.id}` }));
+  const baseline = weapons[0] as Weapon;
+
+  const party = roster.heroes.map((hero): PartyMember => {
+    const stats = heroStats(hero);
+    const held = loadoutWeapons(hero);
     return {
-      classId,
-      name: data.name,
-      role: data.role,
-      healthMax: data.healthMax,
-      moveSpeedScale: data.moveSpeedScale,
+      classId: hero.classId,
+      name: hero.name,
+      role: hero.role,
+      healthMax: stats.healthMax,
+      moveSpeedScale: stats.moveSpeedScale,
+      accuracy: stats.accuracy,
       carry: {
         alive: true,
-        health: data.healthMax,
+        health: stats.healthMax,
         armor: 0,
-        weapons: held,
-        weaponId: starter.id,
+        weapons: [baseline, ...held],
+        weaponId: held[0]?.id ?? baseline.id,
         ammo: new Map(),
       },
     };
   });
-  return { seed, depth: 1, weapons, party, history: [], config };
+  return { seed, delveNumber, depth: 1, weapons, party, pack: [], history: [], config };
 }
 
 /** The party members that are still on their feet. */
@@ -140,6 +134,7 @@ export function partySpecs(run: DelveRun, setup: LevelSetup, delve: Delve = load
     spawn: spawns[slot % spawns.length] as { x: number; y: number },
     role: member.role,
     behavior: delve.partyBehavior,
+    attributes: { accuracy: member.accuracy },
     healthMax: member.healthMax,
     moveSpeedScale: member.moveSpeedScale,
     carry: member.carry,
@@ -178,7 +173,18 @@ export function finishLevel(run: DelveRun, setup: LevelSetup, state: SimState): 
     mobs: mobs.length,
     mobsKilled: mobs.filter((bot) => !bot.alive).length,
     partyAlive: partyAlive(run),
+    loot: [],
   };
+  if (record.reason === "cleared") {
+    // The loot of a clear is a function of the delve seed and the depth, so a
+    // replay of the delve finds the same items.
+    const rng = createRng(deriveSeed(run.seed, `loot:${setup.depth}`), "loot");
+    for (let i = 0; i < rewardCount(setup.depth); i += 1) {
+      const item = rollItem(rng, setup.depth, `d${run.delveNumber}-loot-${run.pack.length}`, run.config);
+      run.pack.push(item);
+      record.loot.push(item.name);
+    }
+  }
   run.history.push(record);
   run.depth += 1;
   return record;
@@ -196,4 +202,61 @@ export function deepestCleared(run: DelveRun): number {
     if (record.reason === "cleared") deepest = Math.max(deepest, record.depth);
   }
   return deepest;
+}
+
+/**
+ * The weapons that the party picked up from the weapon points, one of each.
+ * A loadout weapon, the baseline, a power-up and a mob weapon are not loot.
+ */
+function pickedUpWeapons(roster: Roster, run: DelveRun): Weapon[] {
+  const baseline = run.weapons[0]?.id;
+  const seen = new Set<string>();
+  const out: Weapon[] = [];
+  for (const member of run.party) {
+    for (const weapon of member.carry.weapons) {
+      if (weapon.id === baseline || weapon.tier === POWERUP_TIER || seen.has(weapon.id)) continue;
+      if (isEquipped(roster, weapon.id)) continue;
+      seen.add(weapon.id);
+      out.push(weapon);
+    }
+  }
+  return out;
+}
+
+/**
+ * The party comes back to town, and the delve ends.
+ *
+ * Town heals every hero to full, raises the fallen, and refills the ammo: a
+ * delve always starts from the loadouts at full strength. A party that got
+ * back puts the pack and the weapons it picked up into the stash. A wipe loses
+ * them. Equipped items are never lost.
+ */
+export function returnToTown(roster: Roster, run: DelveRun): DelveSummary {
+  const wiped = !canGoDeeper(run);
+  const deepest = run.history.reduce((most, level) => Math.max(most, level.depth), 0);
+  const found: Item[] = [
+    ...run.pack,
+    ...pickedUpWeapons(roster, run).map((weapon) => weaponItem(weapon, weapon.id, deepest)),
+  ];
+  const summary: DelveSummary = {
+    delveNumber: run.delveNumber,
+    levels: [...run.history],
+    deepestCleared: deepestCleared(run),
+    wiped,
+    banked: [],
+    lost: [],
+  };
+  for (const item of found) {
+    if (wiped) {
+      summary.lost.push(item.name);
+      continue;
+    }
+    const uid = newUid(roster);
+    roster.stash.push(item.kind === "weapon" ? weaponItem(item.weapon, uid, item.depth) : { ...item, uid });
+    summary.banked.push(item.name);
+  }
+  roster.delves = run.delveNumber;
+  roster.bestDepth = Math.max(roster.bestDepth, summary.deepestCleared);
+  roster.lastDelve = summary;
+  return summary;
 }

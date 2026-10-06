@@ -8,6 +8,7 @@ import { exploreGoal } from "../src/ai/utility.js";
 import { runDelve } from "../src/delve/batch.js";
 import { levelConfig, packCount, partySpawns, placePacks } from "../src/delve/level.js";
 import { mobWeapon } from "../src/delve/mobs.js";
+import { createRoster } from "../src/delve/roster.js";
 import {
   canGoDeeper,
   createRun,
@@ -171,7 +172,7 @@ describe("mobs", () => {
   });
 
   it("stand in packs far from the party, one mob a cell", () => {
-    const setup = nextLevel(createRun(11));
+    const setup = nextLevel(createRun(createRoster(11)));
     const cells = setup.mobs.map((mob) => cellIndex(setup.arena, mob.spawn.x, mob.spawn.y));
     expect(new Set(cells).size).toBe(cells.length);
     const field = distanceField(setup.arena, partySpawns(setup.arena));
@@ -183,7 +184,7 @@ describe("mobs", () => {
   });
 
   it("are placed the same way from the same seed", () => {
-    const setup = nextLevel(createRun(11));
+    const setup = nextLevel(createRun(createRoster(11)));
     const again = placePacks(setup.arena, [3, 3], createRng(5, "mobs"));
     const twice = placePacks(setup.arena, [3, 3], createRng(5, "mobs"));
     expect(again).toEqual(twice);
@@ -192,7 +193,7 @@ describe("mobs", () => {
 
 describe("a run", () => {
   it("starts with a full party, each with a weapon of its own", () => {
-    const run = createRun(21);
+    const run = createRun(createRoster(21));
     expect(run.party.map((member) => member.name)).toEqual(["Fighter", "Thief", "Wizard"]);
     expect(partyAlive(run)).toBe(3);
     const starters = run.party.map((member) => member.carry.weaponId);
@@ -200,7 +201,7 @@ describe("a run", () => {
   });
 
   it("carries the party from one level into the next", () => {
-    const run = createRun(21);
+    const run = createRun(createRoster(21));
     const setup = nextLevel(run);
     const state = startLevel(run, setup);
     runRound(state);
@@ -236,7 +237,7 @@ describe("a run", () => {
   });
 
   it("stops when nobody is standing", () => {
-    const run = createRun(41);
+    const run = createRun(createRoster(41));
     for (const member of run.party) member.carry = { ...member.carry, alive: false, health: 0 };
     expect(canGoDeeper(run)).toBe(false);
   });

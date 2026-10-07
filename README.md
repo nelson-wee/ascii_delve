@@ -9,7 +9,9 @@ ASCII Delve is a fork of
 team shooter with indirect control. It keeps the engine of the tournament: the
 arena generators, the utility AI, the combat, and the neon ASCII display.
 
-[`docs/delve.md`](docs/delve.md) gives the design of the delve: the game loop,
+[`docs/roadmap.md`](docs/roadmap.md) gives the plan: the agreed decisions,
+the milestones in order, and the register of placeholder systems.
+[`docs/delve.md`](docs/delve.md) gives the design of the delve as it is built: the game loop,
 what changed in the engine, the classes, the mobs, the levels, the measurements,
 and the known issues. [`docs/dev-guide.md`](docs/dev-guide.md) is the design of
 the engine, written for the tournament.

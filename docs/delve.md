@@ -256,10 +256,5 @@ mean health of a hero from 110 to 170 and the depth that it clears from 3.25 to
 
 ## 11. Next steps
 
-These are the steps of the scoping discussion, in order:
-
-1. Change `TeamId` to factions, and remove the symmetry code.
-2. Split `BotState`. Change `Weapon` into an `Ability` that equipment gives.
-3. A shop, gold, and a waypoint to start a delve deeper.
-4. Loot drops from mobs, and class limits on items.
-5. Bosses.
+`docs/roadmap.md` gives the order of work, the agreed decisions, and the
+placeholder register. It replaces the list of next steps that was here.

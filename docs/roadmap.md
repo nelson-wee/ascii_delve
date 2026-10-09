@@ -44,6 +44,7 @@ section.
 | D11 | **Procedural set-pieces.** A level can hold hand-designed, procedurally placed rooms with their own rules, as Brogue's machine rooms (Section 10). |
 | D12 | **The base is a hub of facilities**, as in Darkest Dungeon (Section 11). |
 | D13 | **Each damage type and status effect has a glyph** (Section 6.5). |
+| D14 | **Five damage types:** kinetic, thermal, toxic, energy, cryo. No radiation. |
 
 ### 2.1 Defaults that still need a confirmation
 
@@ -57,8 +58,15 @@ until a confirmation changes them.
 | A3 | **Progression:** from gear and traits only. No experience levels. Look at this again after M6. | M6 |
 | A4 | **A sector:** a chain of 3 to 5 levels, with a boss room at the end from M8. | M5 |
 | A5 | **Crafting cost:** a blueprint (from a boss clear), plus materials (from sector loot), plus credits. | M9 |
-| A6 | **Strain:** combat stress that rises on a mission and can give a negative trait; base facilities lower it (Section 11.2). | M9 |
-| A7 | **Damage types:** the four core types, with cryo and radiation as candidates (Section 6.5). | M4 |
+
+### 2.2 Parked decisions
+
+A parked decision is not a default. No milestone builds it until the decision
+is made, and a milestone that touches it says so.
+
+| # | Question | Why it is parked |
+|---|---|---|
+| A6 | **Strain:** combat stress that rises on a mission, can give a negative trait, and that base facilities lower (Section 11.2). | It changes the balance between the tactical layer (the missions) and the strategic layer (the base and the roster). Decide it with the design of the base in M9. |
 
 ## 3. The process of one milestone
 
@@ -158,7 +166,7 @@ See Section 6 for the full scope.
 
 - A status effect system: burn, poison, slow, stun, suppressed, marked,
   shielded.
-- **Damage types** (kinetic, thermal, toxic, energy) and **resistances** on
+- **Damage types** (kinetic, thermal, toxic, energy, cryo; D14) and **resistances** on
   armour and on enemies.
 - **Fields:** a per-cell model of fire, gas and smoke that spreads, decays and
   is blocked by walls.
@@ -232,9 +240,10 @@ See Sections 8 and 11.
 - The facility framework: each facility has levels that credits and materials
   upgrade, and a marine assigned to an activity misses the next deployment.
 - New facilities: the **engineering bay** (crafts signature weapons from
-  blueprints), the **training sim**, the **rec room**, the **ops room**, and the
-  **memorial** (from M7) as a facility.
-- **Strain** (A6), if confirmed.
+  blueprints), the **training sim**, the **ops room**, and the **memorial**
+  (from M7) as a facility.
+- **Strain is parked** (A6). M9 does not build it, and the rec room waits
+  with it.
 - **Done when:** each boss unlocks at least one blueprint, each signature
   weapon does something that no generated weapon does, and the campaign batch
   shows that the facility upgrades are a credit sink that pays back.
@@ -259,8 +268,7 @@ See Sections 8 and 11.
   family is defined by what it resists and what it uses.
 - Drop tables and materials belong to sectors, so loot (M6) comes after them.
 - Bosses (M8) need effects, sectors, set-pieces and good loot. Engineering
-  (M9) needs bosses, and the other base activities need veterans (M7) and the
-  strain they collect.
+  (M9) needs bosses, and the training sim needs veterans (M7).
 - Automation (M10) is a layer over finished content.
 
 ## 5. Placeholder register
@@ -324,7 +332,7 @@ part, so an empty field costs almost nothing.
 | Gas launcher | A projectile that releases a gas cloud on impact | Gas field, poison |
 | Smoke grenade (gear) | Releases smoke | Smoke field |
 | Arc | Hits a target, then chains to the nearest other enemies within a range | Energy damage |
-| Cryo | Slows the target; stacks into a stun | Slow, stun |
+| Cryo | Cryo damage that slows the target; the slow stacks into a stun | Cryo damage, slow, stun |
 | EMP | Energy damage that disables drones and shields | Stun on machines |
 | Suppressive fire | Low damage; the target loses accuracy and stays in cover | Suppressed |
 | Rail | A line that passes through actors and low cover | Kinetic, ignores cover |
@@ -337,9 +345,11 @@ are burn, poison, slow, stun, suppressed, marked and shielded.
 
 ### 6.5 Damage types, resistances and glyphs
 
-Four damage types: kinetic, thermal, toxic, energy. Armour and enemies have a
-resistance to each. This is what gives a sector its own gear: bugs burn,
-soldiers wear kinetic armour, machines fall to EMP.
+Five damage types (D14): kinetic, thermal, toxic, energy, cryo. Armour and
+enemies have a resistance to each. This is what gives a sector its own gear:
+bugs burn, soldiers wear kinetic armour, machines fall to EMP. Cryo is the
+control type: less damage, but it slows, and a slow that stacks becomes a stun,
+so it holds a swarm back or pins a heavy target. Radiation is out of scope.
 
 **Each damage type has a glyph** (D13). The glyph appears on item stat lines,
 resistance lines, the hit sparks of the effects layer, and the kill feed.
@@ -350,8 +360,7 @@ resistance lines, the hit sparks of the effects layer, and the kill feed.
 | Thermal (fire, plasma heat) | ♨ | U+2668 | Core |
 | Toxic (poison, acid, gas) | ☣ | U+2623 | Core |
 | Energy (electric, EMP, arc) | ϟ | U+03DF | Core |
-| Cryo (cold, slow) | ❄ | U+2744 | Candidate (A7) |
-| Radiation | ☢ | U+2622 | Candidate (A7). The tournament used it for the Redeemer. |
+| Cryo (cold, slow) | ❄ | U+2744 | Core |
 
 **Status effects use glyphs too:**
 
@@ -368,7 +377,7 @@ resistance lines, the hit sparks of the effects layer, and the kill feed.
 **Rendering rules.** A check in the game's canvas font (2026-10-09) measured
 every glyph above at one cell wide. Two rules still apply:
 
-1. ⚠, ❄, ☢ and ☣ have an emoji form on some systems. The game appends the
+1. ⚠, ❄ and ☣ have an emoji form on some systems. The game appends the
    text-presentation selector U+FE0E to each of them, and the M4 browser check
    tests them on Windows, macOS and a phone.
 2. ☣ and ♨ draw small at grid size. They are for stat lines and the legend; on
@@ -522,14 +531,14 @@ and materials to upgrade. This gives the incremental layer a place to spend.
 | Quartermaster | Buy and sell basic items and gear charges. | M3 |
 | Engineering bay | Craft signature weapons from blueprints (Section 8). | M9 |
 | Training sim | Retrain a marine: change one trait, at a cost. | M9 |
-| Rec room | Lower strain (Section 11.2). | M9 |
+| Rec room | Lower strain (Section 11.2). | Parked with A6 |
 | Ops room | Choose missions, with modifiers and rumours of set-pieces and loot. | M9 |
 | Memorial | The record of the dead. | M7 (list), M9 (facility) |
 
 A marine assigned to an activity misses the next deployment, as in Darkest
 Dungeon. That is the reason for a roster of 8: you rotate the squad.
 
-### 11.2 Strain (A6, needs a confirmation)
+### 11.2 Strain (A6, parked)
 
 Darkest Dungeon's stress, in a sci-fi form.
 
@@ -540,7 +549,8 @@ Darkest Dungeon's stress, in a sci-fi form.
 - The rec room lowers strain. A long rest lowers it slowly.
 
 Strain gives rotation a cost and makes the base matter after every delve. It
-is a large system, so it waits until M9, and it needs a confirmation first.
+also changes how the missions and the base pull on each other, so it is parked
+(Section 2.2). No milestone builds it until A6 is decided.
 
 ## 12. How to change this roadmap
 

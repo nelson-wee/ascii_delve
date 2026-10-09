@@ -40,6 +40,10 @@ section.
 | D7 | **Sectors are distinct.** Each sector has its own environment, arena generator, enemy family, hazards and loot. |
 | D8 | **Engineering at base.** A boss clear unlocks a blueprint. A blueprint crafts a signature weapon. |
 | D9 | **Effects get their own milestone.** New attack types and status effects, including a diffusion model for fire and gas. |
+| D10 | **Procedural item art.** Each weapon gets a small ASCII picture, built from its own numbers, as in Cogmind (Section 9). |
+| D11 | **Procedural set-pieces.** A level can hold hand-designed, procedurally placed rooms with their own rules, as Brogue's machine rooms (Section 10). |
+| D12 | **The base is a hub of facilities**, as in Darkest Dungeon (Section 11). |
+| D13 | **Each damage type and status effect has a glyph** (Section 6.5). |
 
 ### 2.1 Defaults that still need a confirmation
 
@@ -53,6 +57,8 @@ until a confirmation changes them.
 | A3 | **Progression:** from gear and traits only. No experience levels. Look at this again after M6. | M6 |
 | A4 | **A sector:** a chain of 3 to 5 levels, with a boss room at the end from M8. | M5 |
 | A5 | **Crafting cost:** a blueprint (from a boss clear), plus materials (from sector loot), plus credits. | M9 |
+| A6 | **Strain:** combat stress that rises on a mission and can give a negative trait; base facilities lower it (Section 11.2). | M9 |
+| A7 | **Damage types:** the four core types, with cryo and radiation as candidates (Section 6.5). | M4 |
 
 ## 3. The process of one milestone
 
@@ -122,6 +128,8 @@ that replaces it.
     every squad member, as `focusFire` does now).
 - The items are fixed templates in `data/items.json`. They are not generated
   yet.
+- **Weapon art** (D10, Section 9): every weapon gets its ASCII picture on the
+  loadout screen and in the squad panel.
 - **Replaces:** the role-per-class model, and the armour and trinket table.
 - **Done when:** in the batch, each implant gives a measurably different job
   (share of damage dealt, damage taken, healing done), and a gear item changes
@@ -174,11 +182,14 @@ the next ones when it is cleared. See Section 7 for the first three.
 - An **enemy family** is a set of enemy types plus an AI doctrine for the
   family. Bugs swarm and close in; soldiers hold cover and fire lanes, which is
   what the tournament AI already does.
+- **Set-pieces** (D11, Section 10): the framework, and two or three set-pieces
+  for each sector.
 - **Replaces:** depth 1, 2, 3 with a cycle of arena styles, and the placeholder
   enemies.
 - **Done when:** each sector plays differently in the batch (fight distance,
-  time in cover, enemies per fight), and a loadout that is strong in one sector
-  is measurably weaker in another.
+  time in cover, enemies per fight), a loadout that is strong in one sector is
+  measurably weaker in another, and every set-piece fires its triggers in a
+  test.
 
 ### M6 — Loot and materials
 
@@ -187,6 +198,7 @@ the next ones when it is cleared. See Section 7 for the first three.
 - Drop tables for each sector and enemy type. Loot drops from enemies.
 - **Materials** for engineering (A5), with sector-specific kinds.
 - The inventory screen: compare, filter, sell, and a stash limit.
+- Item art (Section 9) for armour, implants and gear.
 - **Replaces:** the loot of each clear (`rewards`) and the fixed item templates
   of M2, which stay as the starting items.
 - **Done when:** the time to the next upgrade and the power curve meet the
@@ -205,20 +217,27 @@ the next ones when it is cleared. See Section 7 for the first three.
 ### M8 — Bosses
 
 - A boss framework: phases, telegraphed area attacks, adds, an enrage timer,
-  and a boss arena at the end of a sector.
+  and a boss arena at the end of a sector. A boss arena is a set-piece
+  (Section 10), so the boss uses the same triggers.
 - One boss per sector. Each boss tests one part of the loadout: a resistance,
   single-target damage, area control, or healing.
 - A boss clear sets a flag that engineering reads.
 - **Done when:** the batch win rate for each boss depends on the loadout, as
   the design note says.
 
-### M9 — Engineering
+### M9 — Base expansion and engineering
 
-See Section 8.
+See Sections 8 and 11.
 
-- A base module that crafts signature weapons from blueprints.
-- **Done when:** each boss unlocks at least one blueprint, and each signature
-  weapon does something that no generated weapon does.
+- The facility framework: each facility has levels that credits and materials
+  upgrade, and a marine assigned to an activity misses the next deployment.
+- New facilities: the **engineering bay** (crafts signature weapons from
+  blueprints), the **training sim**, the **rec room**, the **ops room**, and the
+  **memorial** (from M7) as a facility.
+- **Strain** (A6), if confirmed.
+- **Done when:** each boss unlocks at least one blueprint, each signature
+  weapon does something that no generated weapon does, and the campaign batch
+  shows that the facility upgrades are a credit sink that pays back.
 
 ### M10 — Automation and offline progress
 
@@ -239,8 +258,9 @@ See Section 8.
 - Effects and damage types (M4) come before sectors (M5), because an enemy
   family is defined by what it resists and what it uses.
 - Drop tables and materials belong to sectors, so loot (M6) comes after them.
-- Bosses (M8) need effects, sectors and good loot. Engineering (M9) needs
-  bosses.
+- Bosses (M8) need effects, sectors, set-pieces and good loot. Engineering
+  (M9) needs bosses, and the other base activities need veterans (M7) and the
+  strain they collect.
 - Automation (M10) is a layer over finished content.
 
 ## 5. Placeholder register
@@ -257,6 +277,7 @@ See Section 8.
 | Depth 1, 2, 3… with a cycle of arena styles | `delve/level.ts` | M5 |
 | Grunts, archers and brutes | `data/delve.json` `mobs` | M0 (sci-fi names), M5 (enemy families) |
 | Heal and revive everyone on return | `delve/run.ts` `returnToTown` | M3 (death rule) |
+| The town screen as the whole base | `ui/screens.ts` | M3 (base), M9 (facilities) |
 | The tournament code and docs | `src/meta`, `src/report`, `src/cli/batch.ts`, `docs/dev-guide.md` | M0 |
 
 ## 6. Effects and attack types (M4)
@@ -314,11 +335,46 @@ One list of status effects per actor replaces `bot.dots`. Each effect has a
 kind, a magnitude, a duration, a source, and a stacking rule. The first kinds
 are burn, poison, slow, stun, suppressed, marked and shielded.
 
-### 6.5 Damage types and resistances
+### 6.5 Damage types, resistances and glyphs
 
 Four damage types: kinetic, thermal, toxic, energy. Armour and enemies have a
 resistance to each. This is what gives a sector its own gear: bugs burn,
 soldiers wear kinetic armour, machines fall to EMP.
+
+**Each damage type has a glyph** (D13). The glyph appears on item stat lines,
+resistance lines, the hit sparks of the effects layer, and the kill feed.
+
+| Damage type | Glyph | Code point | Status |
+|---|---|---|---|
+| Kinetic (ballistic) | ⚠ | U+26A0 | Core |
+| Thermal (fire, plasma heat) | ♨ | U+2668 | Core |
+| Toxic (poison, acid, gas) | ☣ | U+2623 | Core |
+| Energy (electric, EMP, arc) | ϟ | U+03DF | Core |
+| Cryo (cold, slow) | ❄ | U+2744 | Candidate (A7) |
+| Radiation | ☢ | U+2622 | Candidate (A7). The tournament used it for the Redeemer. |
+
+**Status effects use glyphs too:**
+
+| Status | Glyph | Code point | Notes |
+|---|---|---|---|
+| Marked (target painter) | ⌖ | U+2316 | A position marker: the right meaning |
+| Shielded | ◘ | U+25D8 | Already the shield and armour glyph of the UI |
+| Stunned | ✱ | U+2731 | |
+| Suppressed | ▼ | U+25BC | |
+| Bleeding (downed) | ‡ | U+2021 | |
+| Burning, poisoned, chilled | ♨, ☣, ❄ | | The glyph of the damage type |
+| Blast (area hit spark) | ✹ | U+2739 | |
+
+**Rendering rules.** A check in the game's canvas font (2026-10-09) measured
+every glyph above at one cell wide. Two rules still apply:
+
+1. ⚠, ❄, ☢ and ☣ have an emoji form on some systems. The game appends the
+   text-presentation selector U+FE0E to each of them, and the M4 browser check
+   tests them on Windows, macOS and a phone.
+2. ☣ and ♨ draw small at grid size. They are for stat lines and the legend; on
+   the map, a status shows as the colour of the actor.
+
+Do not use ≈ or ≋ for an effect: ≈ is the hazard tile of the map.
 
 ### 6.6 What the AI must learn
 
@@ -368,7 +424,125 @@ Each sector needs:
     further on machines and stuns them.
 - **Later, if wanted:** upgrades of a crafted item, using more materials.
 
-## 9. How to change this roadmap
+## 9. Procedural item art (D10)
+
+Each weapon gets a small ASCII picture, as in Cogmind, so a player can read a
+loadout at a glance. The picture is **built from the weapon's own numbers**, so
+two weapons that fight the same way look alike, and the picture never lies.
+
+### 9.1 How a picture is built
+
+A picture is a fixed box (about 24 columns by 4 rows). A part comes from a
+weapon field:
+
+| Part | Comes from | Example |
+|---|---|---|
+| Barrel length | `rangeMax` and `optimalRange` | A sniper barrel runs the full width; a shotgun barrel is short |
+| Muzzle | `attackType` | A flared mouth for a cone, a tube for a projectile, an emitter for a line or arc, a nozzle for a flamethrower |
+| Optic | The archetype: marksman and precision | A scope on top |
+| Magazine | `ammoMax` | A box under the body; a drum for a large magazine |
+| Vents | `fireIntervalTicks` | Cooling fins on a fast-firing weapon |
+| Colour | The tier, and the damage type from M4 | Standard, strong, prize, signature |
+
+A sketch of a long-range precision rifle:
+
+```
+    ▄▄▄▄▄
+ ╒══╧═══╧═╤════════════─
+ ╘═╤╤═▄▄▄═╛
+   ╘╛ ▐▌
+```
+
+A small variant per part (for example, the shape of the stock) comes from a
+hash of the weapon id, so the same weapon always gets the same picture.
+
+### 9.2 Where it lives
+
+- `src/weapons/art.ts`: a pure function from a weapon to lines of text and
+  colour spans. No browser code, so tests can check it (the same picture for
+  the same weapon, a fixed width, and a different picture for a different
+  attack type).
+- The loadout screen and the squad panel draw it (M2).
+- Armour, implants and gear get pictures in M6.
+
+## 10. Procedural set-pieces (D11)
+
+A **set-piece** is a hand-designed room with its own rules, placed by the
+level generator, as Brogue's machine rooms. It gives a level a moment that a
+random pack of enemies cannot.
+
+### 10.1 What a set-piece is
+
+A set-piece is a data record in `data/setpieces.json`:
+
+- **Where it fits:** the room size, the number of exits, and the position (a
+  dead end, a choke point, the centre).
+- **Tiles:** walls, low cover, hazards and fuel that it stamps into the room.
+- **Actors:** enemies, static emplacements, and destructible objects, each at a
+  position in the room.
+- **Triggers:** "when X happens, do Y". For example: when an actor dies, spawn
+  enemies; when the squad sees a cell, wake the room; when an object is
+  destroyed, turn off the emplacements.
+- **A reward:** a loot cache, or a material.
+
+### 10.2 What the engine needs
+
+- **Static actors:** an emplacement holds its cell and has a fire arc.
+- **Destructible objects:** health and no weapon, for example an egg sac or a
+  power node.
+- **Triggers:** they listen to the event bus, which already sends `Death`,
+  `Hit` and the other events.
+- **Placement:** the room graph of the arena generator without the mirror (M1).
+
+### 10.3 First set-pieces
+
+| Sector | Set-piece | What happens |
+|---|---|---|
+| Hive Caverns | **Brood chamber** | A queen surrounded by egg sacs. When the queen dies, or the squad comes close, the sacs burst into swarms of critters. |
+| Hive Caverns | **Acid nursery** | Acid pools and spitters on high ground. |
+| Rebel Fort | **Machine-gun nest** | A heavy gun on an emplacement behind a ring of sandbags, with a wide arc over a corridor. Flank it, or smoke it. |
+| Rebel Fort | **Alarm room** | A sentry runs for an alarm. If the alarm sounds, reinforcements come. |
+| Derelict Station | **Sentry gallery** | Turrets along a hall, fed by a power node. Destroy the node, or EMP it, and the turrets stop. |
+
+Bosses (M8) are set-pieces too, so a boss's adds and phases use the same
+triggers.
+
+## 11. The base as a hub (D12)
+
+After each delve the squad comes back to a base with **facilities**, as in
+Darkest Dungeon. A facility gives an activity, has levels, and costs credits
+and materials to upgrade. This gives the incremental layer a place to spend.
+
+### 11.1 Facilities
+
+| Facility | Activity | Milestone |
+|---|---|---|
+| Barracks | Recruit marines. Upgrades raise the roster cap and the quality of recruits. | M3 |
+| Medbay | Treat wounds faster. Upgrades shorten recovery. | M3 |
+| Quartermaster | Buy and sell basic items and gear charges. | M3 |
+| Engineering bay | Craft signature weapons from blueprints (Section 8). | M9 |
+| Training sim | Retrain a marine: change one trait, at a cost. | M9 |
+| Rec room | Lower strain (Section 11.2). | M9 |
+| Ops room | Choose missions, with modifiers and rumours of set-pieces and loot. | M9 |
+| Memorial | The record of the dead. | M7 (list), M9 (facility) |
+
+A marine assigned to an activity misses the next deployment, as in Darkest
+Dungeon. That is the reason for a roster of 8: you rotate the squad.
+
+### 11.2 Strain (A6, needs a confirmation)
+
+Darkest Dungeon's stress, in a sci-fi form.
+
+- Strain rises on a mission: a marine is downed, a squad mate dies, a swarm
+  surrounds it, a mission runs long.
+- At a threshold, the marine gets a negative trait (the tournament's trait list
+  has "shell-shocked" and "timid" already).
+- The rec room lowers strain. A long rest lowers it slowly.
+
+Strain gives rotation a cost and makes the base matter after every delve. It
+is a large system, so it waits until M9, and it needs a confirmation first.
+
+## 12. How to change this roadmap
 
 1. Change the decision table (Section 2) or a milestone (Section 4) here.
 2. Note the change in the pull request that makes it.

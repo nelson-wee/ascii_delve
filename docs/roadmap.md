@@ -45,6 +45,9 @@ section.
 | D12 | **The base is a hub of facilities**, as in Darkest Dungeon (Section 11). |
 | D13 | **Each damage type and status effect has a glyph** (Section 6.5). |
 | D14 | **Five damage types:** kinetic, thermal, toxic, energy, cryo. No radiation. |
+| D15 | **Death rule** (was A1): a downed marine bleeds out after a time unless a medic treats it. When the squad clears the level, a downed marine that did not bleed out comes home wounded and misses missions. When the squad is wiped, every downed marine dies. Built in M3. |
+| D16 | **Barracks** (was A2): a maximum of 8 marines; 3 deploy. Built in M3. |
+| D17 | **Ready time is separate from fire rate.** A weapon can need time to get ready (to brace, or to spin up) and then fire fast while it stays ready. A heavy machine gun is slow to set up and fast once it is set up (Section 6.8). Built in M4. |
 
 ### 2.1 Defaults that still need a confirmation
 
@@ -53,8 +56,6 @@ until a confirmation changes them.
 
 | # | Default | Decided in |
 |---|---|---|
-| A1 | **Death rule:** a downed marine bleeds out after a time unless a medic treats it. When the squad clears the level, a downed marine that did not bleed out comes home wounded and misses missions. When the squad is wiped, every downed marine dies. | M3 |
-| A2 | **Barracks:** a maximum of 8 marines; 3 deploy. | M3 |
 | A3 | **Progression:** from gear and traits only. No experience levels. Look at this again after M6. | M6 |
 | A4 | **A sector:** a chain of 3 to 5 levels, with a boss room at the end from M8. | M5 |
 | A5 | **Crafting cost:** a blueprint (from a boss clear), plus materials (from sector loot), plus credits. | M9 |
@@ -146,8 +147,8 @@ that replaces it.
 ### M3 — Barracks and base
 
 - **Barracks:** recruit marines, each with a generated name and one random
-  trait (D6). Deploy 3 (A2).
-- **The death rule** (A1): bleed-out, rescue by a medic, wounds, and deaths on
+  trait (D6). Deploy 3 (D16).
+- **The death rule** (D15): bleed-out, rescue by a medic, wounds, and deaths on
   a wipe.
 - **Traits, first set:** about 10 traits, each with a bonus and a cost.
   `dev-guide` Section 7.13 has the first list.
@@ -172,13 +173,17 @@ See Section 6 for the full scope.
   is blocked by walls.
 - New attack types that use them: flamethrower, gas launcher, smoke grenade,
   arc (chain) weapon, cryo, EMP, suppressive fire.
+- **Weapon handling** (D17, Section 6.8): a ready time that is separate from
+  the fire rate, with two ready modes (brace and spin-up), priced by the power
+  budget and read by the AI.
 - The AI reads the fields: they raise the danger map and the path cost, and
   smoke blocks sight.
 - **Replaces:** the hazard tiles and the damage-over-time list of the
   tournament.
 - **Done when:** a gas cloud fills a room and not the corridor behind a closed
-  wall, smoke breaks a sightline, and the batch shows that a damage type matters
-  against an enemy that resists it.
+  wall, smoke breaks a sightline, the batch shows that a damage type matters
+  against an enemy that resists it, and a braced heavy machine gun wins a held
+  corridor but loses when a flank makes it move.
 
 ### M5 — Sectors
 
@@ -399,6 +404,72 @@ Do not use ≈ or ≋ for an effect: ≈ is the hazard tile of the map.
 The neon grid tints a cell by its field value: orange for fire, green for gas,
 grey for smoke. The tint goes under the glyphs, so the arena stays readable.
 
+### 6.8 Weapon handling: ready time and fire rate (D17)
+
+#### 6.8.1 What the engine has now
+
+A shot has two timers today:
+
+| Timer | Field | Belongs to | Meaning |
+|---|---|---|---|
+| Aim | `reactionByBand` (plus the marine's reaction) | The target | The ticks between the first sight of a target and the first shot. It starts again on each new target. |
+| Cadence | `fireIntervalTicks` | The weapon | The ticks between two shots. |
+
+A heavy weapon is slow today because its aim timer is long. That makes it slow
+on **every** new target, and a heavy weapon cannot also be fast. A heavy
+machine gun that sweeps a corridor of targets is not possible.
+
+#### 6.8.2 The third timer: ready
+
+**Ready** belongs to the weapon in the hands of the marine. It does not start
+again when the target changes. A weapon has:
+
+- `readyTicks`: how long it takes to get ready. 0 for most weapons.
+- `readyMode`: how it gets ready, and how it stops being ready.
+- `fireIntervalTicks`: the cadence **once it is ready**.
+
+Two ready modes:
+
+| Mode | Gets ready when | Stops being ready when | Example |
+|---|---|---|---|
+| **Brace** | The marine stands still with the weapon for `readyTicks` | The marine moves more than a short step, or changes weapon | A machine gun on a bipod; a heavy cannon on a tripod |
+| **Spin-up** | The weapon fires. The cadence starts slow and reaches `fireIntervalTicks` after `readyTicks` of steady fire | The weapon stops firing for a short time; the barrels spin down | A rotary cannon; a minigun |
+
+The aim timer stays as it is, and it can be short on a ready weapon. A braced
+machine gun then moves from target to target fast. That is the point of it.
+
+#### 6.8.3 What it costs
+
+The power budget of the weapon generator must price readiness, or a heavy
+machine gun is simply the best weapon. Section 7.20.12 of the tournament guide
+gives the rule: the budget must trade more than damage.
+
+- A weapon with a long ready time gets a higher cadence or damage for the same
+  budget.
+- Its damage profile (`dpsProfile`) states **sustained** damage per second, as
+  now, plus a second number for the **first seconds** of a fight, which includes
+  the ready time. The AI reads both.
+
+#### 6.8.4 What the AI must learn
+
+- **Hold the ground.** A marine with a braced weapon values `HoldPosition` more,
+  and the cost of `Reposition` includes the ready time that it loses. A
+  Fire Support implant makes this strong.
+- **Get ready before the fight.** A marine with a brace weapon braces at a
+  choke point or a sightline when no enemy is in sight: the `TakePosition`
+  action, which already looks for ground that overlooks the fight.
+- **Choose the weapon by the fight.** Against an enemy that is close and
+  fast, the sidearm is better than a weapon that is not ready yet. The weapon
+  choice already reads the damage profile; it reads the "first seconds" number
+  when a fight starts.
+- **Enemies use it too.** The heavy gunner of the Rebel Fort and the machine-gun
+  nest set-piece (Section 10.3) are braced weapons.
+
+#### 6.8.5 Display
+
+The squad panel shows the state of a ready weapon: "bracing 60 %", "ready", or
+"spinning up". The weapon art shows a bipod or a barrel cluster (Section 9.1).
+
 ## 7. Sectors (M5)
 
 The first three sectors. Each uses an arena generator the engine already has.
@@ -451,6 +522,7 @@ weapon field:
 | Optic | The archetype: marksman and precision | A scope on top |
 | Magazine | `ammoMax` | A box under the body; a drum for a large magazine |
 | Vents | `fireIntervalTicks` | Cooling fins on a fast-firing weapon |
+| Bipod or barrel cluster | The ready mode (from M4) | A bipod for a braced weapon; a rotary barrel cluster for a spin-up weapon |
 | Colour | The tier, and the damage type from M4 | Standard, strong, prize, signature |
 
 A sketch of a long-range precision rifle:

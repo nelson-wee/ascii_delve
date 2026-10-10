@@ -3,8 +3,8 @@
  *
  * The run holds the party between levels. After a level the player chooses:
  * go deeper, with the health, the armour, the weapons and the ammo that the
- * party has now, or go back to town, which ends the delve (`returnToTown`). A
- * party member that falls stays down until the party is back in town.
+ * party has now, or go back to base, which ends the delve (`returnToBase`). A
+ * marine that falls stays down until the squad is back at base.
  */
 import { loadDelve } from "../core/data.js";
 import type { EventBus } from "../core/events.js";
@@ -24,7 +24,7 @@ import { POWERUP_TIER } from "../weapons/types.js";
 import { rewardCount, rollItem, weaponItem, type Item } from "./items.js";
 import { buildLevel, createLevelState, levelConfig, partySpawns, type LevelSetup } from "./level.js";
 import {
-  heroStats,
+  marineStats,
   isEquipped,
   loadoutWeapons,
   newUid,
@@ -39,7 +39,7 @@ export interface PartyMember {
   /** The name of the class. It is also the bot id. */
   name: string;
   role: Role;
-  /** The stats of the hero with its gear on (`heroStats`). */
+  /** The stats of the marine with its gear on (`marineStats`). */
   healthMax: number;
   moveSpeedScale: number;
   accuracy: number;
@@ -69,14 +69,14 @@ export interface DelveRun {
   /** The weapons of the weapon points of the levels, with the baseline first. */
   weapons: readonly Weapon[];
   party: PartyMember[];
-  /** The loot of the clears. The party keeps it only if it gets back to town. */
+  /** The loot of the clears. The party keeps it only if it gets back to base. */
   pack: Item[];
   history: LevelRecord[];
   config: SimConfig;
 }
 
 /**
- * A new delve: the heroes of the roster, at full health, with their loadouts,
+ * A new delve: the marines of the roster, at full health, with their loadouts,
  * and a weapon set for the weapon points of its levels.
  */
 export function createRun(roster: Roster, options: { config?: SimConfig; delve?: Delve } = {}): DelveRun {
@@ -92,13 +92,13 @@ export function createRun(roster: Roster, options: { config?: SimConfig; delve?:
   const weapons = set.map((weapon, index) => (index === 0 ? weapon : { ...weapon, id: `d${delveNumber}-${weapon.id}` }));
   const baseline = weapons[0] as Weapon;
 
-  const party = roster.heroes.map((hero): PartyMember => {
-    const stats = heroStats(hero);
-    const held = loadoutWeapons(hero);
+  const party = roster.heroes.map((marine): PartyMember => {
+    const stats = marineStats(marine);
+    const held = loadoutWeapons(marine);
     return {
-      classId: hero.classId,
-      name: hero.name,
-      role: hero.role,
+      classId: marine.classId,
+      name: marine.name,
+      role: marine.role,
       healthMax: stats.healthMax,
       moveSpeedScale: stats.moveSpeedScale,
       accuracy: stats.accuracy,
@@ -133,7 +133,7 @@ export function partySpecs(run: DelveRun, setup: LevelSetup, delve: Delve = load
     label: member.name,
     spawn: spawns[slot % spawns.length] as { x: number; y: number },
     role: member.role,
-    behavior: delve.partyBehavior,
+    behavior: delve.squadBehavior,
     attributes: { accuracy: member.accuracy },
     healthMax: member.healthMax,
     moveSpeedScale: member.moveSpeedScale,
@@ -224,14 +224,14 @@ function pickedUpWeapons(roster: Roster, run: DelveRun): Weapon[] {
 }
 
 /**
- * The party comes back to town, and the delve ends.
+ * The squad comes back to base, and the delve ends.
  *
- * Town heals every hero to full, raises the fallen, and refills the ammo: a
+ * The base heals every marine to full, raises the fallen, and refills the ammo: a
  * delve always starts from the loadouts at full strength. A party that got
  * back puts the pack and the weapons it picked up into the stash. A wipe loses
  * them. Equipped items are never lost.
  */
-export function returnToTown(roster: Roster, run: DelveRun): DelveSummary {
+export function returnToBase(roster: Roster, run: DelveRun): DelveSummary {
   const wiped = !canGoDeeper(run);
   const deepest = run.history.reduce((most, level) => Math.max(most, level.depth), 0);
   const found: Item[] = [

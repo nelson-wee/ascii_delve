@@ -1,9 +1,9 @@
 /**
- * The roster: the heroes, their loadouts, and the stash (docs/delve.md,
+ * The roster: the marines, their loadouts, and the stash (docs/delve.md,
  * Section 10).
  *
- * The roster lasts between delves. A delve takes the heroes as their loadouts
- * make them, at full health. A return to town puts the loot of the delve into
+ * The roster lasts between delves. A delve takes the marines as their loadouts
+ * make them, at full health. A return to base puts the loot of the delve into
  * the stash. The player then moves items between the stash and the slots.
  */
 import { loadDelve, loadTuning } from "../core/data.js";
@@ -16,21 +16,25 @@ import { itemScore, slotKind, SLOTS, weaponItem, type Item, type Slot } from "./
 import { levelConfig } from "./level.js";
 import type { LevelRecord } from "./run.js";
 
-/** One hero of the party, between delves. */
-export interface Hero {
-  /** The class id of `data/delve.json`. */
+/** One marine of the squad, between delves. */
+export interface Marine {
+  /**
+   * The id of the marine's template in `marines` of `data/delve.json`. The key
+   * keeps its old name until the save version 2 of M3.
+   */
   classId: string;
-  /** The name of the class. It is also the bot id in a level. */
+  /** The callsign of the marine. It is also the bot id in a level. */
   name: string;
+  /** The role weights that the marine fights with until the AI implants of M2. */
   role: Role;
-  /** The health of the class, before gear. */
+  /** The health of the marine, before gear. */
   healthMax: number;
-  /** The speed factor of the class, before gear. */
+  /** The speed factor of the marine, before gear. */
   moveSpeedScale: number;
   loadout: Partial<Record<Slot, Item>>;
 }
 
-/** What one delve left behind, for the town screen. */
+/** What one delve left behind, for the base screen. */
 export interface DelveSummary {
   delveNumber: number;
   levels: LevelRecord[];
@@ -44,7 +48,8 @@ export interface DelveSummary {
 
 export interface Roster {
   seed: number;
-  heroes: Hero[];
+  /** The marines. The key keeps its old name until the save version 2 of M3. */
+  heroes: Marine[];
   stash: Item[];
   /** The number that the next item uid takes. */
   nextUid: number;
@@ -55,8 +60,8 @@ export interface Roster {
   lastDelve: DelveSummary | null;
 }
 
-/** The stats of a hero with its gear on. */
-export interface HeroStats {
+/** The stats of a marine with its gear on. */
+export interface MarineStats {
   healthMax: number;
   moveSpeedScale: number;
   accuracy: number;
@@ -69,39 +74,39 @@ export function newUid(roster: Roster): string {
   return uid;
 }
 
-/** The stats of a hero: its class, plus the bonuses of its armour and trinket. */
-export function heroStats(hero: Hero): HeroStats {
-  const stats: HeroStats = {
-    healthMax: hero.healthMax,
-    moveSpeedScale: hero.moveSpeedScale,
+/** The stats of a marine: its template, plus the bonuses of its armour and module. */
+export function marineStats(marine: Marine): MarineStats {
+  const stats: MarineStats = {
+    healthMax: marine.healthMax,
+    moveSpeedScale: marine.moveSpeedScale,
     accuracy: loadTuning().botDefaults.accuracy,
   };
-  for (const item of Object.values(hero.loadout)) {
+  for (const item of Object.values(marine.loadout)) {
     if (!item || item.kind === "weapon") continue;
     stats.healthMax += item.bonus.healthMax ?? 0;
     stats.moveSpeedScale += item.bonus.moveSpeedScale ?? 0;
     stats.accuracy += item.bonus.accuracy ?? 0;
   }
-  // A stack of penalties must not stop a hero, and accuracy is a chance.
+  // A stack of penalties must not stop a marine, and accuracy is a chance.
   stats.healthMax = Math.max(1, stats.healthMax);
   stats.moveSpeedScale = Math.max(0.3, stats.moveSpeedScale);
   stats.accuracy = Math.min(1, Math.max(0.05, stats.accuracy));
   return stats;
 }
 
-/** The weapons of a hero's loadout, in slot order. */
-export function loadoutWeapons(hero: Hero): Weapon[] {
+/** The weapons of a marine's loadout, in slot order. */
+export function loadoutWeapons(marine: Marine): Weapon[] {
   const out: Weapon[] = [];
   for (const slot of ["weapon1", "weapon2"] as const) {
-    const item = hero.loadout[slot];
+    const item = marine.loadout[slot];
     if (item?.kind === "weapon") out.push(item.weapon);
   }
   return out;
 }
 
-/** True when the item is in a slot of any hero. */
+/** True when the item is in a slot of any marine. */
 export function isEquipped(roster: Roster, uid: string): boolean {
-  return roster.heroes.some((hero) => Object.values(hero.loadout).some((item) => item?.uid === uid));
+  return roster.heroes.some((marine) => Object.values(marine.loadout).some((item) => item?.uid === uid));
 }
 
 /**
@@ -138,9 +143,9 @@ export function createRoster(seed: number, options: { config?: SimConfig; delve?
   });
   // The first weapon of a set is the baseline, which every bot holds anyway.
   const pool = set.slice(1).map((weapon) => weaponItem(weapon, newUid(roster), 0));
-  const classes = delve.party.map((classId) => {
-    const data = delve.classes[classId];
-    if (!data) throw new Error(`data/delve.json has no class "${classId}"`);
+  const classes = delve.squad.map((classId) => {
+    const data = delve.marines[classId];
+    if (!data) throw new Error(`data/delve.json has no marine "${classId}"`);
     return { classId, data };
   });
   const starters = starterWeapons(classes.map((entry) => entry.data.role), pool, config);
@@ -156,13 +161,13 @@ export function createRoster(seed: number, options: { config?: SimConfig; delve?
 }
 
 /**
- * Put a stash item in a slot of a hero, or empty the slot when `uid` is null.
+ * Put a stash item in a slot of a marine, or empty the slot when `uid` is null.
  * The item that was in the slot goes back to the stash. Returns false, and
  * changes nothing, when the item is not in the stash or does not fit the slot.
  */
-export function equip(roster: Roster, heroIndex: number, slot: Slot, uid: string | null): boolean {
-  const hero = roster.heroes[heroIndex];
-  if (!hero) return false;
+export function equip(roster: Roster, marineIndex: number, slot: Slot, uid: string | null): boolean {
+  const marine = roster.heroes[marineIndex];
+  if (!marine) return false;
   let incoming: Item | null = null;
   if (uid !== null) {
     const index = roster.stash.findIndex((item) => item.uid === uid);
@@ -171,31 +176,31 @@ export function equip(roster: Roster, heroIndex: number, slot: Slot, uid: string
     if (incoming.kind !== slotKind(slot)) return false;
     roster.stash.splice(index, 1);
   }
-  const outgoing = hero.loadout[slot];
+  const outgoing = marine.loadout[slot];
   if (outgoing) roster.stash.push(outgoing);
-  if (incoming) hero.loadout[slot] = incoming;
-  else delete hero.loadout[slot];
+  if (incoming) marine.loadout[slot] = incoming;
+  else delete marine.loadout[slot];
   return true;
 }
 
 /**
- * Give every hero the best items for its role.
+ * Give every marine the best items for its role.
  *
- * All slots go back to the stash first. The heroes then take turns, one slot
- * kind at a time, so each hero gets one good armour before any hero gets a
+ * All slots go back to the stash first. The marines then take turns, one slot
+ * kind at a time, so each marine gets one good armour before any marine gets a
  * second good weapon. A tie goes to the item that was found first.
  */
 export function autoEquip(roster: Roster, config: SimConfig = levelConfig()): void {
-  for (const [index, hero] of roster.heroes.entries()) {
-    for (const slot of SLOTS) if (hero.loadout[slot]) equip(roster, index, slot, null);
+  for (const [index, marine] of roster.heroes.entries()) {
+    for (const slot of SLOTS) if (marine.loadout[slot]) equip(roster, index, slot, null);
   }
   for (const slot of SLOTS) {
-    for (const [index, hero] of roster.heroes.entries()) {
+    for (const [index, marine] of roster.heroes.entries()) {
       let best: Item | null = null;
       let bestValue = 0;
       for (const item of roster.stash) {
         if (item.kind !== slotKind(slot)) continue;
-        const value = itemScore(item, hero.role, config);
+        const value = itemScore(item, marine.role, config);
         if (value > bestValue) {
           best = item;
           bestValue = value;
@@ -217,8 +222,8 @@ export function discard(roster: Roster, uid: string): boolean {
 /** The stash in a stable order: weapons, then armour, then trinkets, best first. */
 export function sortedStash(roster: Roster, config: SimConfig = levelConfig()): Item[] {
   const order: Record<Item["kind"], number> = { weapon: 0, armor: 1, trinket: 2 };
-  // A stash weapon is ranked for the hero that would most want it.
+  // A stash weapon is ranked for the marine that would most want it.
   const score = (item: Item): number =>
-    Math.max(...roster.heroes.map((hero) => itemScore(item, hero.role, config)));
+    Math.max(...roster.heroes.map((marine) => itemScore(item, marine.role, config)));
   return [...roster.stash].sort((a, b) => order[a.kind] - order[b.kind] || score(b) - score(a));
 }

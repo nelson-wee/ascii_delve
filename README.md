@@ -1,54 +1,62 @@
 # ASCII Delve
 
-A party of three bots — a fighter, a thief and a wizard — goes down into a
-dungeon. The bots act on their own AI. The player does not control a bot. The
-player decides when the party goes deeper and when it comes back to town.
+A squad of three marines deploys into hostile sectors. The marines act on their
+own AI. The player does not control a marine. The player controls what each
+marine carries, where the squad goes, and when it comes back to base.
 
 ASCII Delve is a fork of
 [`ascii_tournament`](https://github.com/nelson-wee/ascii_tournament), an ASCII
 team shooter with indirect control. It keeps the engine of the tournament: the
 arena generators, the utility AI, the combat, and the neon ASCII display.
 
-[`docs/delve.md`](docs/delve.md) gives the design of the delve: the game loop,
-what changed in the engine, the classes, the mobs, the levels, the measurements,
-and the known issues. [`docs/dev-guide.md`](docs/dev-guide.md) is the design of
-the engine, written for the tournament.
+| Document | What it holds |
+|---|---|
+| [`docs/roadmap.md`](docs/roadmap.md) | The plan: the agreed decisions, the milestones in order, and the register of placeholder systems. |
+| [`docs/design.md`](docs/design.md) | The design note of each milestone. |
+| [`docs/delve.md`](docs/delve.md) | The game as it is built now. |
+| [`docs/archive/`](docs/archive/) | The design of the tournament engine, and its measurements. |
 
 ## Status
 
-**The town and the inventory.** The game loop works in the browser:
+**M0 — clean baseline and reskin.** The game loop works in the browser:
 
-1. In town, equip the heroes from the stash. Each hero has two weapon slots,
-   an armour slot and a trinket slot.
-2. Select **Enter the dungeon**. The party explores a generated level and
-   fights the packs of mobs. A clear puts loot in the pack.
-3. When the level ends, select **Venture deeper** (the party keeps its health,
-   armour, weapons and ammo) or **Return to town** (the pack goes into the
-   stash, and town heals everyone). A wipe loses the pack. Equipped items are
-   never lost.
+1. At the base, equip the marines from the stash. Each marine has two weapon
+   slots, an armour slot and a module slot until M2.
+2. Select **Deploy**. The squad explores a generated level and fights the packs
+   of hostiles. A clear puts loot in the pack.
+3. When the level ends, select **Push deeper** (the squad keeps its health,
+   armour, weapons and ammo) or **Return to base** (the pack goes into the
+   stash, and the base heals everyone). A wipe loses the pack. Equipped items
+   are never lost.
 
-The browser saves the roster, so a refresh keeps the heroes and the stash.
-After 10 delves with town visits, a party clears about 5 levels, where a fresh
-party clears about 3 (`docs/delve.md`, Section 10.6).
+The browser saves the roster, so a refresh keeps the marines and the stash.
+The next milestone is M1: factions, a stats block, and a generator without the
+mirror (`docs/roadmap.md`).
 
 ## The delve harness
 
 `npm run delve` runs delves with no display. Every delve goes deeper while a
-party member is standing.
+marine is standing.
 
 ```
 npm run delve                                # 40 delves, to depth 10
 npm run delve -- --runs 100 --depth 15 --seed 7
-npm run delve -- --runs 12 --campaign 10     # 10 delves per roster, with town
+npm run delve -- --runs 12 --campaign 10     # 10 delves per roster, with base visits
 ```
 
-It prints, for each depth, how many parties reached it, how many cleared it,
+It prints, for each depth, how many squads reached it, how many cleared it,
 how many were wiped, how many hit the time limit, the mean time of a level, and
-the mean number of mobs. Then it prints the deepest level cleared and the depth
-at which each class fell.
+the mean number of hostiles. Then it prints the deepest level cleared and the
+depth at which each marine fell.
 
-`data/delve.json` holds the numbers: the classes, the mobs, the weights that
-make a party and a mob, and the level curve.
+With `--campaign N`, each roster plays N delves. It goes back to base when a
+marine is down or under half health, and it equips the best of its stash. The
+table gives the depth, the wipes, the items banked and the squad health for
+each delve, and a probe compares the depth that a fresh roster and the
+equipped roster clear.
+
+`data/delve.json` holds the numbers: the marines, the hostiles, the weights
+that make a squad and a hostile, the level curve, the rewards and the gear.
 
 ## Commands
 
@@ -62,13 +70,14 @@ make a party and a mob, and the level curve.
 | `npm run test:watch` | Run the tests and watch for changes. |
 | `npm run typecheck` | Typecheck only. |
 | `npm run lint` | Run ESLint. |
-| `npm run delve` | Run delves with no display and print how deep the party gets. |
-| `npm run batch` | Run the tournament batch harness (see below). |
+| `npm run delve` | Run delves with no display and print how deep the squad gets. |
+| `npm run smoke` | Build the game and play one short session in a headless browser. |
 | `npm run arena` | Print a generated arena and its metrics (see below). |
 
 ## Rules for the code
 
-These rules come from Sections 4 and 13 of the dev guide.
+These rules come from Sections 4 and 13 of the tournament guide
+(`docs/archive/dev-guide.md`), and from the process of `docs/roadmap.md`.
 
 1. The simulation and the display are separate. A module in `src/core`,
    `src/arena`, `src/weapons`, `src/sim`, `src/ai`, `src/progression`,
@@ -80,39 +89,18 @@ These rules come from Sections 4 and 13 of the dev guide.
    global `ROT.RNG` instance.
 5. Tunable numbers go in `data/`, not in the code. A placeholder number is
    listed in the `tbd` array of its data file, or marked TBD in its notes.
-6. A change to the engine must leave the tournament round as it was, while the
-   tournament code is still in the repository. Its tests check this.
+6. Until M1, a change to the engine must leave the two-team round of the engine
+   tests as it was. The engine tests check this.
+7. Each milestone follows the process of `docs/roadmap.md`, Section 3: a design
+   note first, then data, headless code and tests, measurement, UI, the smoke
+   test, and a pull request.
 
 The ESLint configuration and the test `tests/boundary.test.ts` check rules 1
 and 4 automatically.
 
-## The tournament tools
+## Arena tools
 
-The tools below come from the tournament. They still work and still have tests.
-They are a reference while the delve grows, and a later version removes them.
-
-### The batch harness
-
-`npm run batch` runs rounds with no display and reports the balance.
-
-```
-npm run batch                                # data/batch.json, 1000 rounds
-npm run batch -- --rounds 200 --seed 7
-npm run batch -- --config my-batch.json --out results --quiet
-```
-
-It prints a win-rate matrix (tactics preset × arena), the matchup table, a
-win rate per role composition with its own matchup table, the round end
-reasons, the kills by weapon archetype, the weapon use, and any balance
-failure. Every win rate carries its standard error, because a win rate from few
-rounds says little (Section 7.2.1 of the dev guide).
-
-`hits per shot` is not a share: one shot of an area weapon hits several bots,
-so the number passes 1.
-
-It writes `rounds.csv`, `matchups.csv`, and `presets.csv` into the output
-folder. With `--fail-on-balance` the command ends with a non-zero exit code
-when it finds a balance failure, so a workflow can use it as a gate.
+The arena generators come from the tournament. M1 replaces the mirror step.
 
 ### Arena generation
 
@@ -171,6 +159,9 @@ and the slot decides the role of a bot. Section 7.2.1 of the dev guide says why
 this matters and how to check it.
 
 ## Deployment
+
+The workflow `.github/workflows/ci.yml` runs the typecheck, the lint, the
+tests and the smoke test on every pull request and every push to `main`.
 
 The workflow `.github/workflows/deploy.yml` builds the project and deploys it
 to GitHub Pages on each push to `main`. Enable Pages for the repository with

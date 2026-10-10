@@ -238,7 +238,7 @@
         #controls button { min-height: 34px; min-width: 48px; padding: 0 8px; }
         footer { padding-top: 3px; font-size: 0.66rem; gap: 2px 10px; }
       }
-      /* The between-round tactics screen (Section 7.4). */
+      /* The screens over the arena: the base and the level-over screen. */
       #stage { position: relative; }
       .screen {
         position: absolute;
@@ -262,36 +262,6 @@
         text-shadow: 0 0 10px rgba(110, 247, 255, 0.45);
       }
       .screen p { margin: 0; font-size: 0.72rem; }
-      .tactics {
-        display: grid;
-        gap: 6px;
-        grid-template-columns: 1fr;
-      }
-      @media (min-width: 640px) {
-        .tactics { grid-template-columns: 1fr 1fr; gap: 6px 20px; }
-      }
-      .tactic {
-        display: grid;
-        grid-template-columns: 8.5em minmax(0, 1fr);
-        align-items: center;
-        gap: 2px 8px;
-        font-size: 0.74rem;
-      }
-      .tactic-name { color: var(--fg); }
-      .tactic-help { grid-column: 2; font-size: 0.66rem; }
-      .tactic-control { display: flex; align-items: center; gap: 6px; }
-      .tactic input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
-      .tactic output { width: 2.4em; text-align: right; color: var(--dim); }
-      .tactic select {
-        font: inherit;
-        font-size: 0.74rem;
-        min-height: 32px;
-        color: var(--fg);
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 5px;
-        padding: 0 6px;
-      }
       .menu-group {
         border-top: 1px solid var(--line);
         padding-top: 10px;
@@ -306,78 +276,7 @@
         color: var(--fg);
       }
       .menu-styles { display: flex; flex-wrap: wrap; gap: 6px; }
-      /* The replay box and the saved matches (dev-guide Section 7.23). */
-      .menu-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; }
-      .ticket-input {
-        flex: 1 1 16ch;
-        min-width: 0;
-        min-height: 40px;
-        padding: 0 10px;
-        font: inherit;
-        font-size: 0.72rem;
-        color: var(--fg);
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 5px;
-      }
-      .ticket-input:focus-visible { outline: 2px solid var(--team-a); outline-offset: 1px; }
-      .ticket-note { margin: 0; min-height: 1em; }
-      .tickets {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        max-height: 30vh;
-        overflow-y: auto;
-      }
-      .tickets li {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        grid-template-areas: "name actions" "where actions";
-        gap: 2px 8px;
-        align-items: center;
-        padding: 6px 8px;
-        border: 1px solid var(--line);
-        border-radius: 5px;
-        background: var(--panel);
-      }
-      .tickets b { grid-area: name; font-size: 0.76rem; }
-      .tickets .dim {
-        grid-area: where;
-        font-size: 0.64rem;
-        overflow-wrap: anywhere;
-      }
-      .ticket-actions { grid-area: actions; display: flex; gap: 4px; }
-      .ticket-actions .choice { min-height: 32px; padding: 0 10px; }
-      /* The lobby and the round brief (dev-guide Section 7.25). */
-      .lobby-weapons, .brief-weapons {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        font-size: 0.72rem;
-      }
-      .lobby-weapons li, .brief-weapons li { color: var(--fg); }
-      .brief-stats {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 4px 14px;
-      }
-      .brief-stat {
-        display: flex;
-        gap: 6px;
-        align-items: baseline;
-        font-size: 0.72rem;
-      }
-      .brief-stat b { color: var(--team-a); }
-      /* The per-bot view of the round (dev-guide Section 7.27). */
-      .brief-head { justify-content: space-between; align-items: center; }
-      .brief-head h3 { margin: 0; }
-      .brief-head .choice { min-height: 30px; padding: 0 10px; font-size: 0.7rem; }
+      /* The rows of the squad on the base and level-over screens. */
       .brief-bots {
         list-style: none;
         margin: 0;
@@ -432,8 +331,8 @@
         box-shadow: 0 0 16px rgba(110, 247, 255, 0.35);
       }
       /* The town (docs/delve.md, Section 10): heroes, slots, and the stash. */
-      .town { display: flex; flex-direction: column; gap: 8px; }
-      .hero {
+      .base-hub { display: flex; flex-direction: column; gap: 8px; }
+      .marine {
         display: flex;
         flex-direction: column;
         gap: 6px;
@@ -442,8 +341,8 @@
         background: var(--panel);
         border-radius: 4px;
       }
-      .hero-head { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; font-size: 0.76rem; }
-      .hero-head .dim { font-size: 0.68rem; }
+      .marine-head { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; font-size: 0.76rem; }
+      .marine-head .dim { font-size: 0.68rem; }
       .slots { display: grid; grid-template-columns: 1fr; gap: 4px; }
       @media (min-width: 640px) {
         .slots { grid-template-columns: 1fr 1fr; }

@@ -1,12 +1,13 @@
 /**
- * Items: what a hero equips, and what a clear gives (docs/delve.md, Section 10).
+ * Items: what a marine equips, and what a clear gives (docs/delve.md, Section 10).
  *
- * Three kinds of item, and four slots on each hero:
+ * Three kinds of item, and four slots on each marine:
  *
  * - A **weapon** goes in `weapon1` or `weapon2`. It is a generated weapon of
  *   Section 7.3. The bot still holds the baseline rifle as its fallback, and
  *   the AI still chooses the weapon to fire from the DPS profile.
- * - **Armour** goes in `armor`. A **trinket** goes in `trinket`. Each gives
+ * - **Armour** goes in `armor`. A **module** goes in `trinket` (the key keeps
+ *   its old name until the save version 2 of M3). Each gives
  *   stat bonuses: more health, a speed factor, or accuracy.
  *
  * An item has a uid. A weapon item takes the uid as its weapon id, because the
@@ -60,7 +61,7 @@ export const SLOT_NAMES: Readonly<Record<Slot, string>> = {
   weapon1: "Weapon 1",
   weapon2: "Weapon 2",
   armor: "Armour",
-  trinket: "Trinket",
+  trinket: "Module",
 };
 
 /** Make a weapon into an item. The weapon takes the uid as its id. */
@@ -84,11 +85,11 @@ export function describeItem(item: Item): string {
   if (healthMax) parts.push(`${healthMax > 0 ? "+" : ""}${Math.round(healthMax)} health`);
   if (moveSpeedScale) parts.push(`${moveSpeedScale > 0 ? "+" : ""}${Math.round(moveSpeedScale * 100)}% speed`);
   if (accuracy) parts.push(`${accuracy > 0 ? "+" : ""}${Math.round(accuracy * 100)}% accuracy`);
-  return `${item.kind} · ${parts.join(", ") || "no bonus"}`;
+  return `${item.kind === "trinket" ? "module" : item.kind} · ${parts.join(", ") || "no bonus"}`;
 }
 
 /**
- * What an item is worth to a hero of a role. Auto-equip and the sort order of
+ * What an item is worth to a marine of a role. Auto-equip and the sort order of
  * the stash read it.
  *
  * A weapon is worth its mean DPS, raised by the weapon preference of the role,
@@ -121,10 +122,10 @@ function drawWeighted<T extends string>(rng: Rng, weights: Readonly<Partial<Reco
 
 /** A word for the quality of a piece of gear. */
 function qualityWord(quality: number): string {
-  if (quality < 0.95) return "Worn ";
+  if (quality < 0.95) return "Salvaged ";
   if (quality < 1.2) return "";
-  if (quality < 1.6) return "Fine ";
-  return "Masterwork ";
+  if (quality < 1.6) return "Refined ";
+  return "Prototype ";
 }
 
 /** A piece of armour or a trinket from a depth. */

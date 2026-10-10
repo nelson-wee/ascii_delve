@@ -8,11 +8,11 @@ import {
   createRoster,
   discard,
   equip,
-  heroStats,
+  marineStats,
   isEquipped,
   type Roster,
 } from "../src/delve/roster.js";
-import { createRun, finishLevel, nextLevel, returnToTown, startLevel } from "../src/delve/run.js";
+import { createRun, finishLevel, nextLevel, returnToBase, startLevel } from "../src/delve/run.js";
 import { loadRoster, saveRoster } from "../src/delve/save.js";
 import { runRound } from "../src/sim/index.js";
 
@@ -64,10 +64,10 @@ describe("items", () => {
 });
 
 describe("a loadout", () => {
-  it("starts with one weapon for each hero", () => {
+  it("starts with one weapon for each marine", () => {
     const roster = createRoster(5);
-    expect(roster.heroes.map((hero) => hero.name)).toEqual(["Fighter", "Thief", "Wizard"]);
-    for (const hero of roster.heroes) expect(hero.loadout.weapon1?.kind).toBe("weapon");
+    expect(roster.heroes.map((marine) => marine.name)).toEqual(["Kade", "Moss", "Reyes"]);
+    for (const marine of roster.heroes) expect(marine.loadout.weapon1?.kind).toBe("weapon");
     expect(roster.stash).toHaveLength(0);
   });
 
@@ -99,12 +99,12 @@ describe("a loadout", () => {
 
   it("adds the bonuses of armour and trinkets to the stats", () => {
     const roster = stocked();
-    const hero = roster.heroes[0]!;
-    const before = heroStats(hero).healthMax;
+    const marine = roster.heroes[0]!;
+    const before = marineStats(marine).healthMax;
     const armour = firstOf(roster, "armor");
     equip(roster, 0, "armor", armour.uid);
     if (armour.kind !== "weapon") {
-      expect(heroStats(hero).healthMax).toBeCloseTo(Math.max(1, before + (armour.bonus.healthMax ?? 0)));
+      expect(marineStats(marine).healthMax).toBeCloseTo(Math.max(1, before + (armour.bonus.healthMax ?? 0)));
     }
   });
 
@@ -112,13 +112,13 @@ describe("a loadout", () => {
     const roster = stocked(7, 20);
     const total = roster.stash.length + roster.heroes.length;
     autoEquip(roster);
-    const placed = roster.heroes.flatMap((hero) => SLOTS.flatMap((slot) => (hero.loadout[slot] ? [hero.loadout[slot]!.uid] : [])));
+    const placed = roster.heroes.flatMap((marine) => SLOTS.flatMap((slot) => (marine.loadout[slot] ? [marine.loadout[slot]!.uid] : [])));
     expect(new Set(placed).size).toBe(placed.length);
     for (const uid of placed) expect(roster.stash.some((item) => item.uid === uid)).toBe(false);
     expect(placed.length + roster.stash.length).toBe(total);
-    for (const hero of roster.heroes) {
+    for (const marine of roster.heroes) {
       for (const slot of SLOTS) {
-        const item = hero.loadout[slot];
+        const item = marine.loadout[slot];
         if (item) expect(item.kind).toBe(slotKind(slot));
       }
     }
@@ -135,19 +135,19 @@ describe("a loadout", () => {
 });
 
 describe("a delve from the roster", () => {
-  it("takes the loadout and the stats of each hero", () => {
+  it("takes the loadout and the stats of each marine", () => {
     const roster = stocked();
     autoEquip(roster);
     const run = createRun(roster);
     const state = startLevel(run, nextLevel(run));
-    for (const hero of roster.heroes) {
-      const bot = state.bots.find((candidate) => candidate.id === hero.name)!;
-      const stats = heroStats(hero);
+    for (const marine of roster.heroes) {
+      const bot = state.bots.find((candidate) => candidate.id === marine.name)!;
+      const stats = marineStats(marine);
       expect(bot.healthMax).toBeCloseTo(stats.healthMax);
       expect(bot.health).toBeCloseTo(stats.healthMax);
       expect(bot.attributes.accuracy).toBeCloseTo(stats.accuracy);
       const wanted = SLOTS.filter((slot) => slot.startsWith("weapon"))
-        .map((slot) => hero.loadout[slot])
+        .map((slot) => marine.loadout[slot])
         .filter((item): item is Item => item !== undefined)
         .map((item) => item.uid);
       expect(bot.weapons.slice(1).map((weapon) => weapon.id)).toEqual(wanted);
@@ -168,13 +168,13 @@ describe("a delve from the roster", () => {
   });
 });
 
-describe("the return to town", () => {
+describe("the return to base", () => {
   it("banks the pack and the weapons picked up, with new uids", () => {
     const roster = createRoster(17);
     const { run } = playDelve(roster, 2, "deeper");
     // This seed comes back alive with loot, so the test reads a real bank.
     expect(run.party.some((member) => member.carry.alive)).toBe(true);
-    const summary = returnToTown(roster, run);
+    const summary = returnToBase(roster, run);
     expect(roster.delves).toBe(1);
     expect(summary.wiped).toBe(false);
     expect(summary.banked.length).toBeGreaterThan(run.pack.length);
@@ -189,23 +189,23 @@ describe("the return to town", () => {
 
   it("loses the pack on a wipe, and keeps what is equipped", () => {
     const roster = createRoster(19);
-    const loadout = roster.heroes.map((hero) => hero.loadout.weapon1?.uid);
+    const loadout = roster.heroes.map((marine) => marine.loadout.weapon1?.uid);
     const run = createRun(roster);
     run.pack.push(rollItem(createRng(1, "x"), 1, "d1-loot-0", levelConfig()));
     for (const member of run.party) member.carry = { ...member.carry, alive: false, health: 0 };
-    const summary = returnToTown(roster, run);
+    const summary = returnToBase(roster, run);
     expect(summary.wiped).toBe(true);
     expect(summary.lost.length).toBeGreaterThan(0);
     expect(roster.stash).toHaveLength(0);
-    expect(roster.heroes.map((hero) => hero.loadout.weapon1?.uid)).toEqual(loadout);
+    expect(roster.heroes.map((marine) => marine.loadout.weapon1?.uid)).toEqual(loadout);
   });
 
-  it("heals: the next delve starts at full health with every hero up", () => {
+  it("heals: the next delve starts at full health with every marine up", () => {
     const roster = createRoster(23);
     const first = createRun(roster);
     for (const member of first.party) member.carry = { ...member.carry, alive: false, health: 0 };
     first.party[0]!.carry = { ...first.party[0]!.carry, alive: true, health: 1 };
-    returnToTown(roster, first);
+    returnToBase(roster, first);
     const next = createRun(roster);
     expect(next.delveNumber).toBe(2);
     for (const member of next.party) {

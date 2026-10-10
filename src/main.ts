@@ -1,9 +1,9 @@
 /**
  * Browser entry point (docs/delve.md).
  *
- * The town is the start screen. "Enter the dungeon" makes a new run and starts
- * depth 1. When a level ends, the level-over screen asks the player to go
- * deeper, with the party as it is, or to go back to town, which ends the run.
+ * The base is the start screen. "Deploy" makes a new delve and starts depth 1.
+ * When a level ends, the level-over screen asks the player to push deeper, with
+ * the squad as it is, or to go back to base, which ends the delve.
  *
  * The arena draws on two canvases (Section 7.18): the grid below and the
  * effects above. This file is the one place that joins the two sides. It reads
@@ -18,7 +18,7 @@ import { autoEquip, createRoster, discard, equip, type Roster } from "./delve/ro
 import {
   canGoDeeper,
   createRun,
-  returnToTown,
+  returnToBase,
   finishLevel,
   nextLevel,
   startLevel,
@@ -33,7 +33,7 @@ import type { WeaponVisualHints } from "./render/vfxLayer.js";
 import { simConfigFromTuning, step, type SimState } from "./sim/index.js";
 import { createBotStatus } from "./ui/botStatus.js";
 import { clearRoster, readRoster, writeRoster } from "./ui/saveStore.js";
-import { openLevelOverScreen, openTownScreen, type Screen } from "./ui/screens.js";
+import { openBaseScreen, openLevelOverScreen, type Screen } from "./ui/screens.js";
 import { createSpeedControls } from "./ui/speedControls.js";
 
 const INITIAL_SPEED: Speed = 1;
@@ -69,8 +69,8 @@ function buildLegend(theme: NeonTheme): string {
     [PICKUP_GLYPHS.health.ch, "health", PICKUP_GLYPHS.health.color],
     [PICKUP_GLYPHS.powerup.ch, "powerup", PICKUP_GLYPHS.powerup.color],
     [PICKUP_GLYPHS.ammo.ch, "ammo", PICKUP_GLYPHS.ammo.color],
-    ["@", "party", theme.teamA],
-    ["@", "mobs", theme.teamB],
+    ["@", "squad", theme.teamA],
+    ["@", "hostiles", theme.teamB],
   ];
   return items
     .map(([glyph, label, color]) => `<b style="color:${color}">${glyph}</b> ${label}`)
@@ -146,7 +146,7 @@ try {
   legendEl.innerHTML = buildLegend(DEFAULT_THEME);
 
   // ------------------------------------------------------------------------
-  // The state of the visit. A delve lasts from "Enter" to "Return to town".
+  // The state of the visit. A delve lasts from "Deploy" to "Return to base".
   // ------------------------------------------------------------------------
   let run: DelveRun | null = null;
   let setup: LevelSetup | null = null;
@@ -236,9 +236,9 @@ try {
     const party = standing(state, "A");
     const mobs = standing(state, "B");
     scoreEl.innerHTML = [
-      `<span style="color:${theme.teamA}">party ${party.alive}/${party.total}</span>`,
+      `<span style="color:${theme.teamA}">squad ${party.alive}/${party.total}</span>`,
       `<span class="dim">·</span>`,
-      `<span style="color:${theme.teamB}">mobs ${mobs.alive}/${mobs.total}</span>`,
+      `<span style="color:${theme.teamB}">hostiles ${mobs.alive}/${mobs.total}</span>`,
     ].join(" ");
 
     // The feed only changes when an event arrives, so it is not rebuilt at the
@@ -259,8 +259,8 @@ try {
     const clock = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     statusEl.textContent =
       state.outcome === null
-        ? `depth ${depth}  ·  ${clock}  ·  ${mobs.alive} mobs left`
-        : `depth ${depth}  ·  ${state.outcome.reason === "cleared" ? "cleared" : state.outcome.reason === "wiped" ? "the party fell" : "time ran out"}`;
+        ? `depth ${depth}  ·  ${clock}  ·  ${mobs.alive} hostiles left`
+        : `depth ${depth}  ·  ${state.outcome.reason === "cleared" ? "cleared" : state.outcome.reason === "wiped" ? "the squad was wiped" : "time ran out"}`;
   }
 
   /** One animation frame: the panel, the grid, then the effects on top. */
@@ -274,7 +274,7 @@ try {
   // The delve loop
   // ------------------------------------------------------------------------
 
-  /** Start a new delve at depth 1, with the heroes as their loadouts make them. */
+  /** Start a new delve at depth 1, with the marines as their loadouts make them. */
   function enterDungeon(): void {
     run = createRun(roster);
     startNextLevel();
@@ -327,45 +327,45 @@ try {
       run: current,
       record,
       canGoDeeper: canGoDeeper(current),
-      nextLevelText: `Depth ${current.depth} is a ${styleAt(current.depth, delve)} with about ${packs} packs of mobs.`,
+      nextLevelText: `Depth ${current.depth} is a ${styleAt(current.depth, delve)} with about ${packs} packs of hostiles.`,
       onDeeper: () => {
         closeScreen();
         startNextLevel();
       },
-      onTown: () => {
+      onBase: () => {
         closeScreen();
-        returnToTown(roster, current);
+        returnToBase(roster, current);
         writeRoster(roster);
         run = null;
-        showTown();
+        showBase();
       },
     });
   }
 
   // ------------------------------------------------------------------------
-  // The town
+  // The base
   // ------------------------------------------------------------------------
 
-  function showTown(): void {
+  function showBase(): void {
     runner.setSpeed(0);
     speedControls.setEnabled(false);
     // The panel reads `state`. Clearing it stops the last level writing over
-    // the panel while the town is open.
+    // the panel while the base is open.
     state = null;
     setup = null;
     view.setState(null);
     stage.vfx.clear();
-    statusEl.textContent = "In town.";
-    metaEl.textContent = `town  ·  seed ${roster.seed}`;
+    statusEl.textContent = "At base.";
+    metaEl.textContent = `base  ·  seed ${roster.seed}`;
     scoreEl.textContent = "";
     feedEl.replaceChildren();
     drawnEvents = -1;
-    screen = openTownScreen({
+    screen = openBaseScreen({
       container: stageEl,
       roster,
       seed: roster.seed,
-      onEquip: (heroIndex, slot, uid) => {
-        equip(roster, heroIndex, slot, uid);
+      onEquip: (marineIndex, slot, uid) => {
+        equip(roster, marineIndex, slot, uid);
         writeRoster(roster);
       },
       onAutoEquip: () => {
@@ -385,7 +385,7 @@ try {
         roster = createRoster(Math.floor(Date.now() / 1000));
         writeRoster(roster);
         closeScreen();
-        showTown();
+        showBase();
       },
     });
   }
@@ -422,7 +422,7 @@ try {
     },
   });
 
-  showTown();
+  showBase();
   runner.start();
 } catch (error) {
   showError(error);

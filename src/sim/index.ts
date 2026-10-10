@@ -40,14 +40,6 @@ export {
   updateProjectiles,
 } from "./attacks.js";
 export {
-  runMatch,
-  createRoundState,
-  type MatchResult,
-  type MatchPlan,
-  type TeamPlan,
-  type GetTactics,
-} from "./match.js";
-export {
   applyPickups,
   createPickupStates,
   damageMultiplierOf,

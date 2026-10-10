@@ -21,6 +21,13 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Node scripts, such as the smoke test.
+    files: ["scripts/**/*.mjs"],
+    languageOptions: {
+      globals: { process: "readonly", console: "readonly", fetch: "readonly" },
+    },
+  },
+  {
     files: ["**/*.ts"],
     rules: {
       // Dev guide Section 3: all randomness comes from the seeded RNG streams.

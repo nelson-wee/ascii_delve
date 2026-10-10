@@ -400,7 +400,7 @@ export interface CreateSimStateOptions {
   roundNumber?: number;
   /**
    * The half that team A starts the match on, 0 or 1. It belongs to the match
-   * and not to the round, so `createRoundState` gives it from the match seed
+   * and not to the round, so a match gave it from the match seed
    * (Section 7.20.24). A single round with no match around it takes 0.
    */
   sideOffset?: number;
@@ -1032,7 +1032,7 @@ export function createSimState(options: CreateSimStateOptions): SimState {
  * Put what a bot carried out of the last round into a new bot.
  *
  * A dead bot stays dead: it never respawns, so a delve party member that fell
- * stays down until the party goes back to town.
+ * stays down until the squad goes back to base.
  */
 function applyCarry(bot: BotState, carry: BotCarry): void {
   // A carry with no weapon keeps the fallback the bot was made with: the first

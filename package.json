@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "description": "ASCII Delve: a party of three AI agents clears procedurally generated dungeon levels. Forked from ascii_tournament.",
+  "description": "ASCII Delve: a sci-fi squad of AI marines clears procedurally generated sectors. Forked from ascii_tournament.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -12,10 +12,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "batch": "tsx src/cli/batch.ts",
     "arena": "tsx src/cli/arena.ts",
-    "styles": "tsx src/cli/styles.ts",
-    "delve": "tsx src/cli/delve.ts"
+    "delve": "tsx src/cli/delve.ts",
+    "smoke": "vite build && node scripts/smoke.mjs"
   },
   "dependencies": {
     "rot-js": "^2.2.1",
@@ -25,6 +24,7 @@
     "@eslint/js": "^9.12.0",
     "@types/node": "^26.6.2",
     "eslint": "^9.12.0",
+    "playwright-core": "^1.56.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.2",
     "typescript-eslint": "^8.8.0",

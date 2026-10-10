@@ -1,5 +1,5 @@
 {
-  "_notes": "A delve (docs/delve.md). The party is team A and the mobs are team B. A class and a mob kind each name a role of data/roles.json, which gives them their tactics and their behavior weights; `mobBehavior` and `mobTactics` then turn a role into a mob that waits in its room, takes no items, and fights as a pack. A mob weapon is the baseline weapon with the fields below put over it. Every number is a placeholder. TBD",
+  "_notes": "A delve (docs/delve.md). The squad is team A and the hostiles are team B until M1 (docs/roadmap.md). Each marine and each kind of hostile names a role of data/roles.json, which gives its tactics and behaviour weights; `hostileBehavior` and `hostileTactics` then turn a role into a hostile that waits in its room, takes no items, and fights as a pack. A hostile weapon is the baseline weapon with the fields below put over it. The marines keep different health until the generic marine of M2. Every number is a placeholder. TBD",
   "timeLimitTicks": 6000,
   "styles": [
     "bastion",
@@ -7,45 +7,45 @@
     "openfield"
   ],
   "weaponsPerRun": 5,
-  "classes": {
-    "fighter": {
-      "name": "Fighter",
+  "marines": {
+    "kade": {
+      "name": "Kade",
       "role": "tank",
       "healthMax": 150,
       "moveSpeedScale": 1
     },
-    "thief": {
-      "name": "Thief",
+    "moss": {
+      "name": "Moss",
       "role": "skirmisher",
       "healthMax": 100,
       "moveSpeedScale": 1.15
     },
-    "wizard": {
-      "name": "Wizard",
+    "reyes": {
+      "name": "Reyes",
       "role": "overwatch",
       "healthMax": 80,
       "moveSpeedScale": 1
     }
   },
-  "party": [
-    "fighter",
-    "thief",
-    "wizard"
+  "squad": [
+    "kade",
+    "moss",
+    "reyes"
   ],
-  "partyBehavior": {
+  "squadBehavior": {
     "holdPosition": 0.5,
     "takePosition": 0.5,
     "chase": 1.3,
     "explore": 1.2
   },
-  "mobs": {
-    "grunt": {
-      "name": "Grunt",
+  "hostiles": {
+    "crawler": {
+      "name": "Crawler",
       "role": "tank",
       "healthMax": 80,
       "moveSpeedScale": 0.85,
       "weapon": {
-        "name": "Claws",
+        "name": "Mandibles",
         "attackType": "hitscan",
         "damage": 9,
         "fireIntervalTicks": 14,
@@ -54,13 +54,13 @@
         "rangeTolerance": 3
       }
     },
-    "archer": {
-      "name": "Archer",
+    "gunner": {
+      "name": "Gunner",
       "role": "overwatch",
       "healthMax": 55,
       "moveSpeedScale": 0.9,
       "weapon": {
-        "name": "Shortbow",
+        "name": "Needle Rifle",
         "attackType": "projectile",
         "damage": 8,
         "fireIntervalTicks": 20,
@@ -70,13 +70,13 @@
         "projectileSpeed": 0.9
       }
     },
-    "brute": {
-      "name": "Brute",
+    "juggernaut": {
+      "name": "Juggernaut",
       "role": "tank",
       "healthMax": 170,
       "moveSpeedScale": 0.7,
       "weapon": {
-        "name": "Cleaver",
+        "name": "Shock Maul",
         "attackType": "cone",
         "damage": 18,
         "fireIntervalTicks": 24,
@@ -87,7 +87,7 @@
       }
     }
   },
-  "mobBehavior": {
+  "hostileBehavior": {
     "seekPickup": 0,
     "takePosition": 0,
     "explore": 0,
@@ -97,7 +97,7 @@
     "chase": 2.0,
     "support": 1.3
   },
-  "mobTactics": {
+  "hostileTactics": {
     "itemControl": 0,
     "holdPosition": 0.6,
     "hazardTolerance": 0.2,
@@ -114,9 +114,9 @@
     "minDistanceShare": 0.35,
     "packSpacingSteps": 8,
     "kindWeights": {
-      "grunt": 4,
-      "archer": 3,
-      "brute": 1
+      "crawler": 4,
+      "gunner": 3,
+      "juggernaut": 1
     }
   },
   "rewards": {
@@ -158,34 +158,34 @@
     ]
   },
   "gear": {
-    "_notes": "The armour and the trinkets of a reward. A bonus grows with the quality of the item; a penalty (a negative number) does not. `moveSpeedScale` adds to the speed factor of the class, and `accuracy` adds to the accuracy attribute. TBD `value` turns each stat into health points, so auto-equip can compare two items.",
+    "_notes": "The armour and the modules (the `trinket` slot until M2) of a reward. A bonus grows with the quality of the item; a penalty (a negative number) does not. `moveSpeedScale` adds to the speed factor of the marine, and `accuracy` adds to the accuracy attribute. TBD `value` turns each stat into health points, so auto-equip can compare two items.",
     "armor": [
       {
-        "name": "Leather Vest",
+        "name": "Flak Vest",
         "healthMax": 15
       },
       {
-        "name": "Chain Mail",
+        "name": "Ceramic Plates",
         "healthMax": 30,
         "moveSpeedScale": -0.05
       },
       {
-        "name": "Plate Armour",
+        "name": "Hardsuit",
         "healthMax": 50,
         "moveSpeedScale": -0.12
       }
     ],
     "trinket": [
       {
-        "name": "Ring of Focus",
+        "name": "Targeting Module",
         "accuracy": 0.05
       },
       {
-        "name": "Boots of Haste",
+        "name": "Servo Module",
         "moveSpeedScale": 0.1
       },
       {
-        "name": "Amulet of Vigour",
+        "name": "Bio-Regulator",
         "healthMax": 15
       }
     ],

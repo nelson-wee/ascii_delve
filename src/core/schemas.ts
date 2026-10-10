@@ -429,34 +429,8 @@ export const TacticsFileSchema = z
   .object({ _notes: z.string().optional(), default: TacticsSchema })
   .strict();
 
-/**
- * `data/batch.json`: the configuration of the batch harness (Section 7.16).
- *
- * `presets` stands in for the doctrines of M11, and `arenas` stands in for the
- * arena profiles of M7.
- */
 /** One of the three roles of Section 7.11. */
 export const RoleSchema = z.enum(["overwatch", "tank", "skirmisher"]);
-
-export const BatchConfigSchema = z
-  .object({
-    _notes: z.string().optional(),
-    rounds: positiveInt,
-    seed: z.number().int(),
-    arenas: z.array(z.string().min(1)).min(1),
-    presets: z.record(z.string().min(1), TacticsSchema),
-    /**
-     * One named role order per team, for the acceptance test of M8: the batch
-     * shows a different result by role composition. Left out, every team plays
-     * the standard one role of each.
-     */
-    compositions: z.record(z.string().min(1), z.array(RoleSchema).min(1)).optional(),
-    outDir: z.string().min(1),
-  })
-  .strict()
-  .refine((value) => Object.keys(value.presets).length > 0, "batch.json needs one preset minimum");
-
-export type BatchConfig = z.infer<typeof BatchConfigSchema>;
 
 /** `data/roles.json`: the role presets and their behavior weights (Section 7.11). */
 export const TeamTacticsSchema = z
@@ -962,21 +936,22 @@ export const DelveSchema = z
     timeLimitTicks: positiveInt,
     styles: z.array(z.enum(["bastion", "openfield", "cavern"])).min(1),
     weaponsPerRun: positiveInt,
-    classes: z.record(z.string().min(1), ActorSchema),
-    /** The class of each party slot, in order. */
-    party: z.array(z.string().min(1)).length(3),
+    /** The marines of a new roster, by id. Generated recruits replace them in M3. */
+    marines: z.record(z.string().min(1), ActorSchema),
+    /** The marine of each squad slot, in order. */
+    squad: z.array(z.string().min(1)).length(3),
     /**
      * The behavior weights that every party member takes over the weights of
      * its role. A tournament role holds ground because the clock makes the
      * other team come to it; a level has mobs that wait, so the party must go
      * to them.
      */
-    partyBehavior: z.record(z.string().min(1), z.number().min(0)),
-    mobs: z.record(z.string().min(1), ActorSchema.extend({ weapon: MobWeaponSchema }).strict()),
-    /** The behavior weights that every mob takes over the weights of its role. */
-    mobBehavior: z.record(z.string().min(1), z.number().min(0)),
-    /** The tactics that every mob takes over the tactics of its role. */
-    mobTactics: TacticsSchema.partial(),
+    squadBehavior: z.record(z.string().min(1), z.number().min(0)),
+    hostiles: z.record(z.string().min(1), ActorSchema.extend({ weapon: MobWeaponSchema }).strict()),
+    /** The behavior weights that every hostile takes over the weights of its role. */
+    hostileBehavior: z.record(z.string().min(1), z.number().min(0)),
+    /** The tactics that every hostile takes over the tactics of its role. */
+    hostileTactics: TacticsSchema.partial(),
     rewards: z
       .object({
         _notes: z.string().optional(),
@@ -1031,10 +1006,10 @@ export const DelveSchema = z
       .strict(),
   })
   .strict()
-  .refine((value) => value.party.every((id) => id in value.classes), "party names a class that is not in classes")
+  .refine((value) => value.squad.every((id) => id in value.marines), "squad names a marine that is not in marines")
   .refine(
-    (value) => Object.keys(value.levels.kindWeights).every((id) => id in value.mobs),
-    "kindWeights names a mob that is not in mobs",
+    (value) => Object.keys(value.levels.kindWeights).every((id) => id in value.hostiles),
+    "kindWeights names a hostile that is not in hostiles",
   )
   .refine(
     (value) => value.levels.packSizeMin <= value.levels.packSizeMax,

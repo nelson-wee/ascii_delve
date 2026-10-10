@@ -1,14 +1,14 @@
 /**
  * The screens of a delve (docs/delve.md). Browser only.
  *
- * - **Town.** The start screen and the hub. The heroes rest here, and the
+ * - **Base.** The start screen and the hub. The marines rest here, and the
  *   player moves items between the stash and their slots.
- * - **Level over.** A level ended. The player chooses: go deeper with the
- *   party as it is, or go back to town.
+ * - **Level over.** A level ended. The player chooses: push deeper with the
+ *   squad as it is, or go back to base.
  */
 import { describeItem, itemScore, slotKind, SLOT_NAMES, SLOTS, type Item, type Slot } from "../delve/items.js";
 import { levelConfig } from "../delve/level.js";
-import { heroStats, sortedStash, type DelveSummary, type Hero, type Roster } from "../delve/roster.js";
+import { marineStats, sortedStash, type DelveSummary, type Marine, type Roster } from "../delve/roster.js";
 import type { DelveRun, LevelRecord, PartyMember } from "../delve/run.js";
 
 export interface Screen {
@@ -92,17 +92,17 @@ export function levelLine(record: LevelRecord): string {
     record.reason === "cleared"
       ? "cleared"
       : record.reason === "wiped"
-        ? "the party fell"
+        ? "the squad was wiped"
         : "time ran out";
-  return `Depth ${record.depth}: ${how}, ${record.mobsKilled}/${record.mobs} mobs, ${record.partyAlive}/3 standing.`;
+  return `Depth ${record.depth}: ${how}, ${record.mobsKilled}/${record.mobs} hostiles, ${record.partyAlive}/3 standing.`;
 }
 
-export interface TownOptions {
+export interface BaseOptions {
   container: HTMLElement;
   roster: Roster;
   seed: number;
   /** Move an item from the stash into a slot, or empty the slot (`null`). */
-  onEquip: (heroIndex: number, slot: Slot, uid: string | null) => void;
+  onEquip: (marineIndex: number, slot: Slot, uid: string | null) => void;
   onAutoEquip: () => void;
   onDiscard: (uid: string) => void;
   onEnter: () => void;
@@ -120,10 +120,10 @@ function itemLabel(element: HTMLElement, item: Item | undefined, empty: string):
   element.append(name, what);
 }
 
-/** The stats of a hero with its gear on, in one line. */
-function statsLine(hero: Hero): string {
-  const stats = heroStats(hero);
-  return `${Math.round(stats.healthMax)} health · speed ${stats.moveSpeedScale.toFixed(2)}× · accuracy ${Math.round(stats.accuracy * 100)}% · ${hero.role}`;
+/** The stats of a marine with its gear on, in one line. */
+function statsLine(marine: Marine): string {
+  const stats = marineStats(marine);
+  return `${Math.round(stats.healthMax)} health · speed ${stats.moveSpeedScale.toFixed(2)}× · accuracy ${Math.round(stats.accuracy * 100)}% · ${marine.role}`;
 }
 
 /** The last delve, in a few lines. */
@@ -134,8 +134,8 @@ function lastDelveGroup(summary: DelveSummary): HTMLElement {
     report.append(
       paragraph(
         summary.lost.length > 0
-          ? `The party fell. Lost with the pack: ${summary.lost.join(", ")}.`
-          : "The party fell. The pack was empty.",
+          ? `The squad was wiped. Lost with the pack: ${summary.lost.join(", ")}.`
+          : "The squad was wiped. The pack was empty.",
         true,
       ),
     );
@@ -144,7 +144,7 @@ function lastDelveGroup(summary: DelveSummary): HTMLElement {
       paragraph(
         summary.banked.length > 0
           ? `Put in the stash: ${summary.banked.join(", ")}.`
-          : "The party found nothing to keep.",
+          : "The squad found nothing to keep.",
         true,
       ),
     );
@@ -153,26 +153,26 @@ function lastDelveGroup(summary: DelveSummary): HTMLElement {
 }
 
 /**
- * The town: the heroes, their slots, and the stash.
+ * The base: the marines, their slots, and the stash.
  *
  * The party is always healed here. Select a slot to see the stash items that
  * fit it; select one to equip it. The item that was in the slot goes back to
  * the stash.
  */
-export function openTownScreen(options: TownOptions): Screen {
+export function openBaseScreen(options: BaseOptions): Screen {
   const { roster } = options;
-  const screen = screenBox(options.container, "ASCII Delve · Town");
+  const screen = screenBox(options.container, "ASCII Delve · Base");
   const body = document.createElement("div");
-  body.className = "town";
+  body.className = "base-hub";
   screen.append(body);
   /** The slot whose choices are open, if any. */
-  let open: { hero: number; slot: Slot } | null = null;
+  let open: { marine: number; slot: Slot } | null = null;
 
   const render = (): void => {
     body.replaceChildren();
     body.append(
       paragraph(
-        "The party rests here: every hero is at full health, the fallen are back on their feet, and the ammo is full. Equip the heroes from the stash, then go down.",
+        "The squad rests at base: every marine is at full health, the fallen are back on their feet, and the ammo is full. Equip the marines from the stash, then deploy.",
         true,
       ),
     );
@@ -181,25 +181,25 @@ export function openTownScreen(options: TownOptions): Screen {
       body.append(paragraph(`Delves: ${roster.delves}. Deepest level cleared: ${roster.bestDepth}.`, true));
     }
 
-    const party = group("The party");
-    for (const [heroIndex, hero] of roster.heroes.entries()) {
+    const party = group("The squad");
+    for (const [marineIndex, marine] of roster.heroes.entries()) {
       const card = document.createElement("div");
-      card.className = "hero";
+      card.className = "marine";
       const head = document.createElement("div");
-      head.className = "hero-head";
+      head.className = "marine-head";
       const name = document.createElement("b");
-      name.textContent = hero.name;
+      name.textContent = marine.name;
       const stats = document.createElement("span");
       stats.className = "dim";
-      stats.textContent = statsLine(hero);
+      stats.textContent = statsLine(marine);
       head.append(name, stats);
       card.append(head);
 
       const slots = document.createElement("div");
       slots.className = "slots";
       for (const slot of SLOTS) {
-        const item = hero.loadout[slot];
-        const isOpen = open?.hero === heroIndex && open.slot === slot;
+        const item = marine.loadout[slot];
+        const isOpen = open?.marine === marineIndex && open.slot === slot;
         const choice = document.createElement("button");
         choice.type = "button";
         choice.className = isOpen ? "choice slot open" : "choice slot";
@@ -210,24 +210,24 @@ export function openTownScreen(options: TownOptions): Screen {
         choice.append(label);
         itemLabel(choice, item, "empty");
         choice.addEventListener("click", () => {
-          open = isOpen ? null : { hero: heroIndex, slot };
+          open = isOpen ? null : { marine: marineIndex, slot };
           render();
         });
         slots.append(choice);
       }
       card.append(slots);
 
-      if (open?.hero === heroIndex) {
+      if (open?.marine === marineIndex) {
         const { slot } = open;
         const picker = document.createElement("div");
         picker.className = "picker";
         const fits = sortedStash(roster).filter((item) => item.kind === slotKind(slot));
-        const current = hero.loadout[slot];
-        const currentScore = current ? itemScore(current, hero.role, levelConfig()) : 0;
+        const current = marine.loadout[slot];
+        const currentScore = current ? itemScore(current, marine.role, levelConfig()) : 0;
         picker.append(
           paragraph(
             fits.length > 0
-              ? `${SLOT_NAMES[slot]} of the ${hero.name}: select an item from the stash.`
+              ? `${SLOT_NAMES[slot]} of ${marine.name}: select an item from the stash.`
               : `The stash has nothing for this slot.`,
             true,
           ),
@@ -236,15 +236,15 @@ export function openTownScreen(options: TownOptions): Screen {
           const pick = document.createElement("button");
           pick.type = "button";
           pick.className = "choice slot";
-          const delta = itemScore(item, hero.role, levelConfig()) - currentScore;
+          const delta = itemScore(item, marine.role, levelConfig()) - currentScore;
           const tag = document.createElement("span");
           tag.className = delta >= 0 ? "slot-name better" : "slot-name worse";
           tag.textContent = `${delta >= 0 ? "+" : "−"}${Math.abs(Math.round(delta))}`;
-          tag.title = "The value of this item to this hero, against the item in the slot now.";
+          tag.title = "The value of this item to this marine, against the item in the slot now.";
           pick.append(tag);
           itemLabel(pick, item, "");
           pick.addEventListener("click", () => {
-            options.onEquip(heroIndex, slot, item.uid);
+            options.onEquip(marineIndex, slot, item.uid);
             open = null;
             render();
           });
@@ -255,7 +255,7 @@ export function openTownScreen(options: TownOptions): Screen {
         if (current) {
           actions.append(
             button("Empty this slot", () => {
-              options.onEquip(heroIndex, slot, null);
+              options.onEquip(marineIndex, slot, null);
               open = null;
               render();
             }),
@@ -276,7 +276,7 @@ export function openTownScreen(options: TownOptions): Screen {
 
     const stash = group(`The stash (${roster.stash.length})`);
     if (roster.stash.length === 0) {
-      stash.append(paragraph("Empty. A clear puts loot in the pack of the party, and a return to town puts it here.", true));
+      stash.append(paragraph("Empty. A clear puts loot in the pack of the squad, and a return to base puts it here.", true));
     } else {
       const list = document.createElement("ul");
       list.className = "stash";
@@ -297,24 +297,24 @@ export function openTownScreen(options: TownOptions): Screen {
     }
     body.append(stash);
 
-    const go = group("The dungeon");
+    const go = group("Deployment");
     go.append(
       paragraph(
-        "Every delve starts at depth 1, on new maps. A clear puts loot in the pack. Go deeper as you are, or come back to keep the loot. A wipe loses the pack; equipped items are never lost.",
+        "Every deployment starts at depth 1, on new maps. A clear puts loot in the pack. Push deeper as you are, or come back to keep the loot. A wipe loses the pack; equipped items are never lost.",
         true,
       ),
     );
     const buttons = document.createElement("div");
     buttons.className = "menu-styles";
     buttons.append(
-      button("Enter the dungeon", options.onEnter, true),
+      button("Deploy", options.onEnter, true),
       button("Auto-equip the best items", () => {
         options.onAutoEquip();
         open = null;
         render();
       }),
       button("Start over", () => {
-        if (window.confirm("Start over with a new party? The heroes, their items and the stash will be lost.")) {
+        if (window.confirm("Start over with a new squad? The marines, their items and the stash will be lost.")) {
           options.onReset();
         }
       }),
@@ -336,22 +336,22 @@ export interface LevelOverOptions {
   /** A line about the next level, for the choice. */
   nextLevelText: string;
   onDeeper: () => void;
-  onTown: () => void;
+  onBase: () => void;
 }
 
-/** A level ended. Go deeper, or go back to town. */
+/** A level ended. Push deeper, or go back to base. */
 export function openLevelOverScreen(options: LevelOverOptions): Screen {
   const { record } = options;
   const title =
     record.reason === "cleared"
       ? `Depth ${record.depth} cleared`
       : record.reason === "wiped"
-        ? `The party fell at depth ${record.depth}`
+        ? `The squad was wiped at depth ${record.depth}`
         : `Depth ${record.depth}: time ran out`;
   const screen = screenBox(options.container, title);
   screen.append(paragraph(levelLine(record)));
 
-  const party = group("The party");
+  const party = group("The squad");
   party.append(partyList(options.run.party));
   screen.append(party);
 
@@ -365,7 +365,7 @@ export function openLevelOverScreen(options: LevelOverOptions): Screen {
       loot.length === 0
         ? "The pack is empty."
         : options.canGoDeeper
-          ? `In the pack: ${loot.join(", ")}. A return to town keeps it. A wipe loses it.`
+          ? `In the pack: ${loot.join(", ")}. A return to base keeps it. A wipe loses it.`
           : `Lost with the pack: ${loot.join(", ")}. Equipped items are safe.`,
       true,
     ),
@@ -376,15 +376,15 @@ export function openLevelOverScreen(options: LevelOverOptions): Screen {
   if (options.canGoDeeper) {
     next.append(
       paragraph(
-        `${options.nextLevelText} The party goes as it is: no healing, and a fallen member stays down. Town heals everyone.`,
+        `${options.nextLevelText} The squad goes as it is: no healing, and a fallen marine stays down. The base heals everyone.`,
         true,
       ),
     );
   }
   const buttons = document.createElement("div");
   buttons.className = "menu-styles";
-  if (options.canGoDeeper) buttons.append(button("Venture deeper", options.onDeeper, true));
-  buttons.append(button("Return to town", options.onTown, !options.canGoDeeper));
+  if (options.canGoDeeper) buttons.append(button("Push deeper", options.onDeeper, true));
+  buttons.append(button("Return to base", options.onBase, !options.canGoDeeper));
   next.append(buttons);
   screen.append(next);
   return { close: () => screen.remove() };

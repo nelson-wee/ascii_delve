@@ -63,7 +63,7 @@ function drawKind(rng: Rng, weights: Readonly<Record<string, number>>): string {
     roll -= weight;
     if (roll < 0) return kind;
   }
-  return entries[entries.length - 1]?.[0] ?? "grunt";
+  return entries[entries.length - 1]?.[0] ?? "crawler";
 }
 
 /** True for a cell that a mob may stand on at the start: plain floor. */
@@ -165,7 +165,7 @@ export function buildLevel(
   for (const pack of packs) {
     for (const cell of pack) {
       const kindId = drawKind(rng, delve.levels.kindWeights);
-      const kind = delve.mobs[kindId];
+      const kind = delve.hostiles[kindId];
       const number = (counts.get(kindId) ?? 0) + 1;
       counts.set(kindId, number);
       mobs.push(mobSpec(kindId, `${kind?.name ?? kindId}${number}`, cell, depth, config, delve));

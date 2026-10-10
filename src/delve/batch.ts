@@ -5,7 +5,7 @@
  *
  * - `runDelve`: how far does a fresh party get if it always goes deeper? It
  *   measures the level curve.
- * - `runCampaign`: does the town loop work? A roster delves again and again,
+ * - `runCampaign`: does the base loop work? A roster delves again and again,
  *   comes back when it is hurt, banks its loot, and equips the best of it. If
  *   the loop works, the depth it reaches goes up with the delves.
  */
@@ -18,7 +18,7 @@ import {
   deepestCleared,
   finishLevel,
   nextLevel,
-  returnToTown,
+  returnToBase,
   startLevel,
   type DelveRun,
   type LevelRecord,
@@ -33,13 +33,13 @@ export interface DelveResult {
 }
 
 /**
- * When a party goes back to town. `deeper` never goes back. `cautious` goes
- * back after a level that left a hero down, or a hero under half health.
+ * When a squad goes back to base. `deeper` never goes back. `cautious` goes
+ * back after a level that left a marine down, or a marine under half health.
  */
 export type ReturnPolicy = "deeper" | "cautious";
 
-/** True when the policy sends the party back to town after this level. */
-export function wantsTown(run: DelveRun, policy: ReturnPolicy): boolean {
+/** True when the policy sends the squad back to base after this level. */
+export function wantsBase(run: DelveRun, policy: ReturnPolicy): boolean {
   if (policy === "deeper") return false;
   return run.party.some((member) => !member.carry.alive || member.carry.health < member.healthMax * 0.5);
 }
@@ -63,7 +63,7 @@ export function playDelve(
     for (const member of run.party) {
       if (!member.carry.alive && fellAt[member.name] === null) fellAt[member.name] = setup.depth;
     }
-    if (wantsTown(run, policy)) break;
+    if (wantsBase(run, policy)) break;
   }
   return { run, fellAt };
 }
@@ -84,7 +84,7 @@ export interface CampaignDelve {
 }
 
 /**
- * Many delves of one roster. After each one the party goes back to town and
+ * Many delves of one roster. After each one the squad goes back to base and
  * equips the best of what it has (`autoEquip`), as a player who reads the
  * numbers would.
  */
@@ -100,7 +100,7 @@ export function runCampaign(
     autoEquip(roster);
     const { run } = playDelve(roster, maxDepth, policy);
     const partyHealth = run.party.reduce((sum, member) => sum + member.healthMax, 0) / run.party.length;
-    const summary = returnToTown(roster, run);
+    const summary = returnToBase(roster, run);
     out.push({
       delveNumber: summary.delveNumber,
       deepestCleared: summary.deepestCleared,

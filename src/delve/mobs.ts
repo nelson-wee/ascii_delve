@@ -2,7 +2,7 @@
  * The mobs of a delve (docs/delve.md).
  *
  * A mob is a bot of team B. Its kind names a role of `data/roles.json`, and
- * `mobBehavior` and `mobTactics` turn that role into a mob: it waits where it
+ * `hostileBehavior` and `hostileTactics` turn that role into a mob: it waits where it
  * stands, it takes no items, and it joins a fight that its pack is already in.
  * The AI is the same utility AI as the party's. Only the weights differ.
  */
@@ -42,8 +42,8 @@ function dpsProfileOf(weapon: Weapon, config: SimConfig): BandValues {
 
 /** The weapon of a mob kind at a depth. */
 export function mobWeapon(kindId: string, depth: number, config: SimConfig, delve: Delve = loadDelve()): Weapon {
-  const kind = delve.mobs[kindId];
-  if (!kind) throw new Error(`data/delve.json has no mob "${kindId}"`);
+  const kind = delve.hostiles[kindId];
+  if (!kind) throw new Error(`data/delve.json has no hostile "${kindId}"`);
   const spec = kind.weapon;
   const base = loadBaselineWeapon();
   const weapon: Weapon = {
@@ -79,8 +79,8 @@ export function mobSpec(
   config: SimConfig,
   delve: Delve = loadDelve(),
 ): BotSpec {
-  const kind = delve.mobs[kindId];
-  if (!kind) throw new Error(`data/delve.json has no mob "${kindId}"`);
+  const kind = delve.hostiles[kindId];
+  if (!kind) throw new Error(`data/delve.json has no hostile "${kindId}"`);
   return {
     id,
     label: kind.name,
@@ -88,9 +88,9 @@ export function mobSpec(
     role: kind.role,
     // A data file holds no `undefined`, but zod types a partial as if it could.
     tactics: Object.fromEntries(
-      Object.entries(delve.mobTactics).filter(([, value]) => value !== undefined),
+      Object.entries(delve.hostileTactics).filter(([, value]) => value !== undefined),
     ) as Partial<Tactics>,
-    behavior: delve.mobBehavior,
+    behavior: delve.hostileBehavior,
     healthMax: kind.healthMax * depthScale(delve.levels.mobHealthPerDepth, depth),
     moveSpeedScale: kind.moveSpeedScale,
     weapons: [mobWeapon(kindId, depth, config, delve)],

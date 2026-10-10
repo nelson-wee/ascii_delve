@@ -159,13 +159,13 @@ describe("exploring", () => {
 describe("mobs", () => {
   it("get stronger with depth", () => {
     const config = simConfigFromTuning();
-    expect(mobWeapon("grunt", 5, config).damage).toBeGreaterThan(mobWeapon("grunt", 1, config).damage);
+    expect(mobWeapon("crawler", 5, config).damage).toBeGreaterThan(mobWeapon("crawler", 1, config).damage);
     expect(packCount(8)).toBeGreaterThan(packCount(1));
     expect(packCount(1000)).toBe(loadDelve().levels.packsMax);
   });
 
   it("give a melee weapon damage at close range only", () => {
-    const weapon = mobWeapon("grunt", 1, simConfigFromTuning());
+    const weapon = mobWeapon("crawler", 1, simConfigFromTuning());
     expect(weapon.dpsProfile.close).toBeGreaterThan(0);
     expect(weapon.dpsProfile.mid).toBe(0);
     expect(weapon.dpsProfile.long).toBe(0);
@@ -194,7 +194,7 @@ describe("mobs", () => {
 describe("a run", () => {
   it("starts with a full party, each with a weapon of its own", () => {
     const run = createRun(createRoster(21));
-    expect(run.party.map((member) => member.name)).toEqual(["Fighter", "Thief", "Wizard"]);
+    expect(run.party.map((member) => member.name)).toEqual(["Kade", "Moss", "Reyes"]);
     expect(partyAlive(run)).toBe(3);
     const starters = run.party.map((member) => member.carry.weaponId);
     expect(new Set(starters).size).toBe(3);

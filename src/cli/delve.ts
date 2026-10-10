@@ -3,7 +3,7 @@
  *
  *   npm run delve                          # 40 delves, to depth 10
  *   npm run delve -- --runs 100 --depth 15 --seed 7
- *   npm run delve -- --campaign 12         # 12 delves per roster, with town
+ *   npm run delve -- --campaign 12         # 12 delves per roster, with base visits
  *
  * Every delve goes deeper while somebody is standing. The table says, for each
  * depth, how many parties reached it, how the level ended, and how long it
@@ -11,9 +11,9 @@
  * find the last mobs, or could not reach them.
  *
  * With `--campaign N`, each of the `--runs` rosters plays N delves. A party
- * goes back to town when a hero is down or under half health, banks its loot,
+ * goes back to base when a marine is down or under half health, banks its loot,
  * and equips the best of it. The table then gives, for each delve, the mean
- * deepest level cleared: if the town loop works, it goes up.
+ * deepest level cleared: if the base loop works, it goes up.
  */
 import {
   probeDepth,
@@ -108,8 +108,8 @@ for (let i = 0; i < options.runs; i += 1) {
 const seconds = (Date.now() - started) / 1000;
 
 console.log(`${options.runs} delves to depth ${options.depth}, seed ${options.seed} (${seconds.toFixed(1)} s)\n`);
-const widths = [6, 8, 8, 7, 7, 10, 7];
-console.log(row(["depth", "reached", "cleared", "wiped", "time", "mean s", "mobs"], widths));
+const widths = [6, 8, 8, 7, 7, 10, 9];
+console.log(row(["depth", "reached", "cleared", "wiped", "time", "mean s", "hostiles"], widths));
 for (const depth of summariseByDepth(results)) {
   console.log(
     row(
@@ -133,7 +133,7 @@ const median = deepest[Math.floor(deepest.length / 2)] ?? 0;
 console.log(`\ndeepest level cleared: mean ${mean.toFixed(2)}, median ${median}, best ${deepest[deepest.length - 1] ?? 0}`);
 
 const names = Object.keys(results[0]?.fellAt ?? {});
-console.log("\nclass   fell   mean depth of the fall");
+console.log("\nmarine  fell   mean depth of the fall");
 for (const name of names) {
   const falls = results.map((result) => result.fellAt[name]).filter((value): value is number => value != null);
   const meanFall = falls.reduce((sum, value) => sum + value, 0) / Math.max(1, falls.length);

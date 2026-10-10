@@ -93,7 +93,7 @@ export function loadRoster(text: string): Roster | null {
   // zod types an optional key as `T | undefined`; a parsed save holds no
   // undefined value, so the cast only narrows the type.
   const roster = parsed.data.roster as unknown as Roster;
-  for (const item of [...roster.stash, ...roster.heroes.flatMap((hero) => Object.values(hero.loadout))]) {
+  for (const item of [...roster.stash, ...roster.heroes.flatMap((marine) => Object.values(marine.loadout))]) {
     if ((item as Item | undefined)?.kind === "weapon") {
       const weapon = (item as { weapon: Weapon }).weapon;
       if (weapon.id !== (item as Item).uid) return null;

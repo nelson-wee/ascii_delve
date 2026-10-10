@@ -110,9 +110,12 @@ that replaces it.
     marines take the current role weights until M2.
   - The town becomes the base.
   - The mobs become placeholder sci-fi enemies until M5.
-  - Armour and trinkets become plating and implants until M2.
+  - Armour and trinkets become armour and modules until M2. ("Implant" is
+    kept for the AI implant slot of M2.)
 - Remove the tournament-only code and its tests: the PvP batch, tickets,
-  sessions, the PvP reports, the arena symmetry and fairness rules.
+  sessions, the match runner, the PvP reports. The arena symmetry and fairness
+  rules move to M1, with the generator that replaces them (`docs/design.md`,
+  M0).
 - Move `docs/dev-guide.md` to `docs/archive/`. Start `docs/design.md`.
 - Add a CI workflow (lint, typecheck, tests on every pull request) and
   `npm run smoke`.
@@ -125,7 +128,9 @@ that replaces it.
 - Split `BotState` into the actor, a **stats** block (health, speed, accuracy,
   mitigation, resistances), a **status effects** list, and the loadout.
 - Arena generation without the mirror: an entrance and rooms, not two spawn
-  halves. Measure the conflict field from the entrance.
+  halves. Measure the conflict field from the entrance. Remove the symmetry
+  and fairness rules of the tournament generator, and the mirror test
+  (`tests/fairness.test.ts`), with it.
 - **A cost budget for many actors.** Swarms need 30 to 50 enemies. An enemy far
   from the squad sleeps; a sleeping enemy does no field-of-view pass.
 - **Done when:** the delve batch is the same within noise, and a level with 50
@@ -316,19 +321,20 @@ See Sections 8 and 11.
 
 | Placeholder | Where | Replaced in |
 |---|---|---|
-| The party of three fixed heroes (Fighter, Thief, Wizard) | `data/delve.json` `classes` | M0 (squad), M2 (generic marine) |
-| Teams `A` (party) and `B` (mobs) | `sim/state.ts` | M1 |
+| Three fixed marines (Kade, Moss, Reyes) with different health and speed | `data/delve.json` `marines` | M2 (generic marine), M3 (generated recruits) |
+| Teams `A` (squad) and `B` (hostiles) | `sim/state.ts` | M1 |
+| The mirror of the arena generator, and the mirror test | `arena/generate.ts`, `tests/fairness.test.ts` | M1 |
+| Save keys with old names: `heroes`, `classId`, `trinket` | `delve/save.ts` | M3 (save version 2) |
 | Two weapon slots of generated weapons | `delve/items.ts` | M2 |
-| Armour and trinket table, quality by depth | `data/delve.json` `gear` | M2, then M6 (stock) |
-| Tournament roles as the AI of each hero | `data/roles.json` | M2 (implants) |
+| Armour and module table, quality by depth | `data/delve.json` `gear` | M2, then M6 (stock) |
+| Tournament roles as the AI of each marine | `data/roles.json` | M2 (implants) |
 | One item per clear, rolled into the pack | `data/delve.json` `rewards` | M6 (materials, credits), M8 (blueprints) |
 | A boss room that holds an elite pack | `data/setpieces.json` (from M5) | M8 |
 | Hazard tiles and damage over time | `sim/attacks.ts` | M4 |
 | Depth 1, 2, 3… with a cycle of arena styles | `delve/level.ts` | M5 |
-| Grunts, archers and brutes | `data/delve.json` `mobs` | M0 (sci-fi names), M5 (enemy families) |
-| Heal and revive everyone on return | `delve/run.ts` `returnToTown` | M3 (death rule) |
-| The town screen as the whole base | `ui/screens.ts` | M3 (base), M9 (facilities) |
-| The tournament code and docs | `src/meta`, `src/report`, `src/cli/batch.ts`, `docs/dev-guide.md` | M0 |
+| Crawlers, gunners and juggernauts | `data/delve.json` `hostiles` | M5 (enemy families) |
+| Heal and revive everyone on return | `delve/run.ts` `returnToBase` | M3 (death rule) |
+| The base screen as the whole base | `ui/screens.ts` | M3 (base), M9 (facilities) |
 
 ## 6. Effects and attack types (M4)
 

@@ -18,7 +18,11 @@ go:
 - **Deployment.** The player chooses the sector, sends the squad in, and decides
   when it comes back to base.
 - **Base.** The squad heals, resupplies, changes its loadouts, recruits, and
-  later crafts signature weapons.
+  crafts the items and upgrades that boss blueprints unlock.
+
+A **run** is a roguelike campaign (A8). Each sector has its own track of
+levels, with bosses that offer a choice of blueprints. A cleared sector unlocks
+stock equipment for every later run, so progress carries between runs.
 
 The feel is an incremental game with tactical stakes. The flavour is sci-fi,
 after XCOM and Into the Breach, and it continues the neon ASCII look of
@@ -38,7 +42,7 @@ section.
 | D5 | **Gear slot:** an active tool with charges or a cooldown, for example a medkit or a target painter. Each gear item adds one AI action. |
 | D6 | **Traits are personal, not equipment.** A new marine gets one random trait. Missions add more. Every trait has a bonus and a cost. A marine that dies loses its traits. |
 | D7 | **Sectors are distinct.** Each sector has its own environment, arena generator, enemy family, hazards and loot. |
-| D8 | **Engineering at base.** A boss clear unlocks a blueprint. A blueprint crafts a signature weapon. |
+| D8 | **Engineering at base.** The engineering station crafts the unique items and fits the upgrades that blueprints unlock (Section 8). |
 | D9 | **Effects get their own milestone.** New attack types and status effects, including a diffusion model for fire and gas. |
 | D10 | **Procedural item art.** Each weapon gets a small ASCII picture, built from its own numbers, as in Cogmind (Section 9). |
 | D11 | **Procedural set-pieces.** A level can hold hand-designed, procedurally placed rooms with their own rules, as Brogue's machine rooms (Section 10). |
@@ -48,6 +52,10 @@ section.
 | D15 | **Death rule** (was A1): a downed marine bleeds out after a time unless a medic treats it. When the squad clears the level, a downed marine that did not bleed out comes home wounded and misses missions. When the squad is wiped, every downed marine dies. Built in M3. |
 | D16 | **Barracks** (was A2): a maximum of 8 marines; 3 deploy. Built in M3. |
 | D17 | **Ready time is separate from fire rate.** A weapon can need time to get ready (to brace, or to spin up) and then fire fast while it stays ready. A heavy machine gun is slow to set up and fast once it is set up (Section 6.8). Built in M4. |
+| D18 | **Progression from gear and traits only** (was A3). No experience levels and no character levels. A marine gets stronger by its loadout and its traits. |
+| D19 | **Each sector has its own track.** A track is 5 levels. The tracks are independent: the player chooses which sector to push next. A boss fight closes levels 1, 3 and 5 of a track (Section 7.1). |
+| D20 | **A blueprint choice after each boss.** The player takes one of the offered blueprints. A blueprint is a **unique item** (pre-made, and scaled to the boss that gave it) or an **upgrade** (fitted to a stock weapon or stock armour at the engineering station) (Section 8). |
+| D21 | **Stock equipment.** A fixed catalogue of standard items. A run starts with a base set. Clearing a sector unlocks more stock, for every later run too, so runs are more consistent (Section 8.3). |
 
 ### 2.1 Defaults that still need a confirmation
 
@@ -56,9 +64,9 @@ until a confirmation changes them.
 
 | # | Default | Decided in |
 |---|---|---|
-| A3 | **Progression:** from gear and traits only. No experience levels. Look at this again after M6. | M6 |
-| A4 | **A sector:** a chain of 3 to 5 levels, with a boss room at the end from M8. | M5 |
-| A5 | **Crafting cost:** a blueprint (from a boss clear), plus materials (from sector loot), plus credits. | M9 |
+| A5 | **Crafting cost:** the blueprint is the unlock; each craft or fit costs sector materials plus credits. | M9 |
+| A8 | **A run:** one campaign with a fresh barracks and the stock that is unlocked. The marines, their traits, the sector tracks, the blueprints and everything crafted belong to the run. A run is won when the level 5 boss of each sector is down, and lost when the barracks cannot field a squad. Stock unlocks and the records (the memorial, the best runs) last between runs. | M3 |
+| A9 | **Random loot:** generated weapons stay, as **field finds** at the weapon points of a level, for variety inside a run. A field find has no upgrade socket. There are no random affixes: upgrades (D20) take their place. Enemies drop materials and credits, not items. | M6 |
 
 ### 2.2 Parked decisions
 
@@ -157,9 +165,14 @@ that replaces it.
 - **Squad orders:** come back when a marine is down, when gear charges run out,
   or when health falls under a set share. This is the "when to retreat"
   control, and the base for automatic play in M10.
+- **Runs** (A8): the start and the end of a run. The save splits in two: the
+  **run** (barracks, sector tracks, blueprints, crafted items) and the **meta
+  record** (stock unlocks, the memorial, the best runs). A lost run clears the
+  run part only.
 - The save gets a schema version 2, with a migration from version 1.
 - **Done when:** the campaign batch shows progression, different orders give
-  different results, and a save of version 1 loads.
+  different results, a save of version 1 loads, and the meta record survives
+  the end of a run.
 
 ### M4 — Effects and new attack types
 
@@ -187,8 +200,9 @@ See Section 6 for the full scope.
 
 ### M5 — Sectors
 
-A world map of sectors (D7, A4). Each sector is a chain of levels, and unlocks
-the next ones when it is cleared. See Section 7 for the first three.
+A world map of sectors (D7, D19). Each sector has its own track of 5 levels.
+All three tracks are open from the start of a run, and the player chooses
+which one to push next. See Section 7 for the first three sectors.
 
 - A sector names: an arena generator and its parameters, an enemy family, the
   environment hazards, and a loot bias.
@@ -197,25 +211,37 @@ the next ones when it is cleared. See Section 7 for the first three.
   what the tournament AI already does.
 - **Set-pieces** (D11, Section 10): the framework, and two or three set-pieces
   for each sector.
+- **Sector tracks** (D19, Section 7.1): the level of a track sets the
+  difficulty of its next mission. Levels 1, 3 and 5 end in a boss room. Until
+  M8, a boss room holds an elite pack set-piece.
+- **A sector clear** (level 5 of its track) unlocks the stock items of that
+  sector (D21). The catalogue itself comes in M6; M5 records the unlock.
 - **Replaces:** depth 1, 2, 3 with a cycle of arena styles, and the placeholder
   enemies.
 - **Done when:** each sector plays differently in the batch (fight distance,
   time in cover, enemies per fight), a loadout that is strong in one sector is
-  measurably weaker in another, and every set-piece fires its triggers in a
-  test.
+  measurably weaker in another, every set-piece fires its triggers in a test,
+  and progress on one track does not change another.
 
-### M6 — Loot and materials
+### M6 — Stock, field finds and materials
 
-- An item generator for all four slots, from the power budget of the weapon
-  generator: item level, rarity, affixes (including resistances).
-- Drop tables for each sector and enemy type. Loot drops from enemies.
-- **Materials** for engineering (A5), with sector-specific kinds.
+- **The stock catalogue** (D21, Section 8.3): fixed items for all four slots in
+  `data/stock.json`. They are made with the power budget of the weapon
+  generator, offline, so they stay balanced. A base set, plus one set for each
+  sector that its clear unlocks.
+- **Upgrade sockets:** a stock weapon and a stock armour have one or two
+  sockets for upgrades (D20).
+- **The quartermaster** sells the unlocked stock for credits.
+- **Field finds** (A9): generated weapons at the weapon points of a level.
+- **Materials and credits** drop from enemies, with a kind of material for each
+  sector (A5).
 - The inventory screen: compare, filter, sell, and a stash limit.
 - Item art (Section 9) for armour, implants and gear.
-- **Replaces:** the loot of each clear (`rewards`) and the fixed item templates
-  of M2, which stay as the starting items.
-- **Done when:** the time to the next upgrade and the power curve meet the
-  targets of the design note.
+- **Replaces:** the loot of each clear (`rewards`), and the fixed templates of
+  M2, which become the base set of stock.
+- **Done when:** the power curve of a run meets the targets of the design note,
+  and a run that starts after a sector clear is measurably stronger in its
+  first missions.
 
 ### M7 — Veterans
 
@@ -232,11 +258,16 @@ the next ones when it is cleared. See Section 7 for the first three.
 - A boss framework: phases, telegraphed area attacks, adds, an enrage timer,
   and a boss arena at the end of a sector. A boss arena is a set-piece
   (Section 10), so the boss uses the same triggers.
-- One boss per sector. Each boss tests one part of the loadout: a resistance,
-  single-target damage, area control, or healing.
-- A boss clear sets a flag that engineering reads.
+- **Three bosses per sector,** at levels 1, 3 and 5 of its track (D19): a
+  lieutenant (one mechanic), a captain (two phases), and the sector boss (the
+  full framework). Nine bosses in all. Each boss tests one part of the
+  loadout: a resistance, single-target damage, area control, or healing.
+- **The blueprint choice** (D20): after a boss, the player takes one of three
+  offered blueprints. The offer comes from the blueprint pool of the sector,
+  and holds at least one unique item and one upgrade while the pool has both.
 - **Done when:** the batch win rate for each boss depends on the loadout, as
-  the design note says.
+  the design note says, and a blueprint offer never repeats a blueprint that the
+  run already holds.
 
 ### M9 — Base expansion and engineering
 
@@ -244,18 +275,21 @@ See Sections 8 and 11.
 
 - The facility framework: each facility has levels that credits and materials
   upgrade, and a marine assigned to an activity misses the next deployment.
-- New facilities: the **engineering bay** (crafts signature weapons from
-  blueprints), the **training sim**, the **ops room**, and the **memorial**
-  (from M7) as a facility.
+- New facilities: the **engineering bay** (crafts the unique items and fits
+  the upgrades of the run's blueprints, Section 8), the **training sim**, the
+  **ops room**, and the **memorial** (from M7) as a facility.
 - **Strain is parked** (A6). M9 does not build it, and the rec room waits
   with it.
-- **Done when:** each boss unlocks at least one blueprint, each signature
-  weapon does something that no generated weapon does, and the campaign batch
-  shows that the facility upgrades are a credit sink that pays back.
+- **Done when:** each sector has a blueprint pool of at least 6 (3 uniques and 3
+  upgrades), each unique does something that no stock item does, an upgrade
+  changes a stock item measurably, and the campaign batch shows that the
+  facility upgrades are a credit sink that pays back.
 
 ### M10 — Automation and offline progress
 
-- Repeat deployments that follow the squad orders, at a chosen speed.
+- Repeat deployments that follow the squad orders, at a chosen speed. A repeat
+  stays inside the current run (A8), and stops at a boss: a blueprint choice is
+  always the player's.
 - Offline progress, from headless runs or from measured rates.
 - A report of each session.
 - **Done when:** the offline estimate is within the target error of a real
@@ -267,13 +301,15 @@ See Sections 8 and 11.
 
 ### Why this order
 
-- The four slots (M2) decide what an item is. Loot (M6) and crafting (M9) wait
-  for them.
+- The four slots (M2) decide what an item is. The stock catalogue (M6) and
+  crafting (M9) wait for them.
 - Effects and damage types (M4) come before sectors (M5), because an enemy
   family is defined by what it resists and what it uses.
-- Drop tables and materials belong to sectors, so loot (M6) comes after them.
-- Bosses (M8) need effects, sectors, set-pieces and good loot. Engineering
-  (M9) needs bosses, and the training sim needs veterans (M7).
+- Materials and the stock that a clear unlocks belong to sectors, so the stock
+  catalogue (M6) comes after them.
+- Bosses (M8) need effects, sectors, set-pieces and stock. Blueprints come
+  from bosses, so engineering (M9) comes after them; it also needs the upgrade
+  sockets of the stock (M6). The training sim needs veterans (M7).
 - Automation (M10) is a layer over finished content.
 
 ## 5. Placeholder register
@@ -283,9 +319,10 @@ See Sections 8 and 11.
 | The party of three fixed heroes (Fighter, Thief, Wizard) | `data/delve.json` `classes` | M0 (squad), M2 (generic marine) |
 | Teams `A` (party) and `B` (mobs) | `sim/state.ts` | M1 |
 | Two weapon slots of generated weapons | `delve/items.ts` | M2 |
-| Armour and trinket table, quality by depth | `data/delve.json` `gear` | M2, then M6 |
+| Armour and trinket table, quality by depth | `data/delve.json` `gear` | M2, then M6 (stock) |
 | Tournament roles as the AI of each hero | `data/roles.json` | M2 (implants) |
-| One item per clear, rolled into the pack | `data/delve.json` `rewards` | M6 |
+| One item per clear, rolled into the pack | `data/delve.json` `rewards` | M6 (materials, credits), M8 (blueprints) |
+| A boss room that holds an elite pack | `data/setpieces.json` (from M5) | M8 |
 | Hazard tiles and damage over time | `sim/attacks.ts` | M4 |
 | Depth 1, 2, 3… with a cycle of arena styles | `delve/level.ts` | M5 |
 | Grunts, archers and brutes | `data/delve.json` `mobs` | M0 (sci-fi names), M5 (enemy families) |
@@ -489,20 +526,82 @@ Each sector needs:
 - **A conflict field from the entrance.** The fort's sightlines must point at
   the way the squad comes in.
 
-## 8. Engineering (M9)
+### 7.1 Sector tracks (D19)
 
-- A **base module** with a list of blueprints. A blueprint is locked until its
-  boss is cleared.
-- **Crafting cost:** the blueprint, sector materials, and credits (A5).
-- A **signature weapon** is fixed, not generated. It combines the M4 effects in
-  a way that no generated weapon can. Examples:
-  - **Hive Burner** (from the brood mother): a flamethrower whose fire leaves a
-    toxic gas cloud when it burns out.
-  - **Breach Rail** (from the commander): a rail that passes through two walls'
-    worth of cover.
-  - **Overload Coil** (from the mainframe): an arc weapon whose chain jumps
-    further on machines and stuns them.
-- **Later, if wanted:** upgrades of a crafted item, using more materials.
+Each sector has a track of 5 levels. A level is one mission. A track keeps its
+place between missions, so a run can push the Hive to level 3 while the Fort is
+still at level 1.
+
+| Track level | Mission | After the mission |
+|---|---|---|
+| 1 | A short level with a **lieutenant** boss room | Blueprint choice |
+| 2 | A level | Materials and credits |
+| 3 | A level with a **captain** boss room | Blueprint choice |
+| 4 | A level | Materials and credits |
+| 5 | A level with the **sector boss** | Blueprint choice, and the sector clear: its stock unlocks (D21) |
+
+**Difficulty** comes from the track level and nothing else. So the order of the
+sectors is the player's strategy: push the sector whose enemies the squad's
+gear beats, and take the blueprints that help against the next one.
+
+**First bosses** (placeholders until M8; each tests one part of the loadout):
+
+| Sector | Level 1: lieutenant | Level 3: captain | Level 5: sector boss |
+|---|---|---|---|
+| Hive Caverns | A **swarm lord**: commands the swarm, and the swarm scatters when it dies | An **acid brood**: lays acid fields; toxic resistance matters | The **brood mother**: egg sacs, waves of critters, area denial |
+| Rebel Fort | A **sergeant** with a machine-gun team behind cover | A **captain** with an armoured walker; kinetic armour on the enemy | The **commander**: calls reinforcements and artillery on marked cells |
+| Derelict Station | A **sentry overseer** that links the turrets | A **repair hub** that rebuilds drones until it falls | The **security mainframe**: shields, EMP pulses, sealed doors |
+
+**A wipe** on a track does not move the track back. The squad that is lost is
+the cost (D15).
+
+## 8. Engineering, blueprints and stock (M6, M8, M9)
+
+### 8.1 Blueprints (D20)
+
+A boss gives a **choice of three blueprints** from the pool of its sector. The
+player takes one. A blueprint belongs to the run (A8). There are two kinds:
+
+| Kind | What it gives | Example |
+|---|---|---|
+| **Unique item** | A pre-made item for any of the four slots. It has a fixed design and a fixed effect. Its numbers scale with the tier of the boss that gave it: lieutenant, captain or sector boss. | **Hive Burner** (weapon): a flamethrower whose fire leaves a toxic gas cloud when it burns out. **Breach Rail** (weapon): a rail that passes through two walls of cover. **Overload Coil** (weapon): an arc whose chain jumps further on machines and stuns them. **Ablative Carapace** (armour): plating grown from hive chitin, strong against toxic damage. **Command Uplink** (AI implant): the marine marks every enemy it sees for the squad. |
+| **Upgrade** | A module that the engineering station fits into a socket of a **stock** weapon or **stock** armour. It changes one thing. | **Incendiary rounds:** the weapon's damage type becomes thermal. **Stabiliser:** the brace time of a heavy weapon halves. **Extended magazine.** **Reactive plating:** the armour resists the first hit of each fight. **Cryo coil:** each hit adds a slow. |
+
+A unique item is a statement: it changes how a marine fights. An upgrade
+sharpens an item the player already trusts. The offer of three holds at least
+one of each kind while the pool has both.
+
+### 8.2 The engineering station
+
+- **Craft a unique:** the blueprint, plus materials of its sector, plus credits
+  (A5). A blueprint can be crafted more than once, at the full cost each time.
+- **Fit an upgrade:** choose a stock weapon or stock armour with a free socket.
+  The cost is the same kind as a craft. An upgrade can be taken out again, and
+  goes back to the store of the run.
+- **Later, if wanted:** a better tier of a unique, from a second clear of the
+  same boss.
+
+### 8.3 Stock (D21)
+
+- **Stock** is a fixed catalogue of standard items for all four slots
+  (`data/stock.json`, M6). The quartermaster sells the stock that is unlocked.
+- Stock is made with the power budget of the weapon generator, offline, so a
+  stock item is balanced against the rest, and the same in every run.
+- **A run starts** with the base set: a standard rifle, standard plating, the
+  first implants and a medkit.
+- **A sector clear unlocks** that sector's stock set, at once and for every
+  later run. For example, the Hive clear unlocks a flamethrower and toxic
+  plating; the Fort clear unlocks a braced machine gun and a target painter.
+- Stock weapons and stock armour have **upgrade sockets** (one or two). A field
+  find (A9) and a unique have none: the stock is the base that a run builds on.
+
+### 8.4 How the three sources of items fit together
+
+| Source | Varies between runs? | Can take upgrades? | Lasts after the run? |
+|---|---|---|---|
+| Stock | No: the same catalogue, larger as sectors are cleared | Yes | The unlock lasts; the items are bought again |
+| Unique (blueprint) | Yes: the offers are random | No | No |
+| Field find | Yes: generated in each level | No | No |
 
 ## 9. Procedural item art (D10)
 
@@ -523,7 +622,7 @@ weapon field:
 | Magazine | `ammoMax` | A box under the body; a drum for a large magazine |
 | Vents | `fireIntervalTicks` | Cooling fins on a fast-firing weapon |
 | Bipod or barrel cluster | The ready mode (from M4) | A bipod for a braced weapon; a rotary barrel cluster for a spin-up weapon |
-| Colour | The tier, and the damage type from M4 | Standard, strong, prize, signature |
+| Colour | The tier, and the damage type from M4 | Stock, field find tiers, unique |
 
 A sketch of a long-range precision rifle:
 
@@ -593,15 +692,16 @@ triggers.
 After each delve the squad comes back to a base with **facilities**, as in
 Darkest Dungeon. A facility gives an activity, has levels, and costs credits
 and materials to upgrade. This gives the incremental layer a place to spend.
+Facility levels belong to the run (A8).
 
 ### 11.1 Facilities
 
 | Facility | Activity | Milestone |
 |---|---|---|
-| Barracks | Recruit marines. Upgrades raise the roster cap and the quality of recruits. | M3 |
+| Barracks | Recruit marines, up to the cap of 8 (D16). Upgrades raise the quality of recruits. | M3 |
 | Medbay | Treat wounds faster. Upgrades shorten recovery. | M3 |
-| Quartermaster | Buy and sell basic items and gear charges. | M3 |
-| Engineering bay | Craft signature weapons from blueprints (Section 8). | M9 |
+| Quartermaster | Buy unlocked stock and gear charges; sell field finds. | M3 (basic), M6 (stock) |
+| Engineering bay | Craft unique items and fit upgrades from the run's blueprints (Section 8). | M9 |
 | Training sim | Retrain a marine: change one trait, at a cost. | M9 |
 | Rec room | Lower strain (Section 11.2). | Parked with A6 |
 | Ops room | Choose missions, with modifiers and rumours of set-pieces and loot. | M9 |
